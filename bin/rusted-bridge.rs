@@ -122,6 +122,11 @@ mod property_file {
 
 use io::ReaderUtil;
 use property_file::read_file;
+use std::uv_iotask;
+use std::net_tcp;
+use std::net_ip::v4;
+use std::uv;
+use pipes::{Port,Chan,select2};
 
 fn main() {
     //let args: ~[~str] = os::args();
@@ -134,10 +139,57 @@ fn main() {
 
     let props = property_file::read_file(p);
 
-    for props.each |k,v| {
-        unsafe {
-            io::println(str::raw::from_c_str(k));
-            io::println(str::raw::from_c_str(v));
+    //for props.each |k,v| {
+    //    unsafe {
+    //        io::println(str::raw::from_c_str(k));
+    //        io::println(str::raw::from_c_str(v));
+    //    }
+    //}
+
+    let (message_chan, message_port) : (Chan<~str>,Port<~str>) = pipes::stream();
+
+    //let our_task : core::task::TaskBuilder = core::task::task();
+    //let our_io_task : std::uv_iotask::IoTask  = std::uv_iotask::spawn_iotask(our_task);
+
+    let io_task = uv::global_loop::get();
+
+    do task::spawn |move message_chan|  {
+      //let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr("127.0.0.1"), 9000, our_io_task); 
+
+      let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr("127.0.0.1"), 9000, io_task); 
+      if conn_res.is_err() {
+        fail ~"failed to connect to socket"
+      }
+      let socket_conn = core::result::unwrap(conn_res);
+      let write_res = socket_conn.write(core::str::to_bytes("is there anybody there in this electronic void?"));
+      if write_res.is_err() {
+        fail ~"error sending command over socket"
+      }
+
+      loop {
+        let read_res = socket_conn.read(0u);
+        if read_res.is_err()  {
+          let err_data = read_res.get_err();
+          if err_data.err_name == ~"EOF" {
+            message_chan.send(~"EOF");
+            break;
+          } else {
+            fail ~"error getting response"
+          }
+        } else {
+          message_chan.send(core::str::from_bytes(core::result::unwrap(read_res)));
         }
+      }
     }
-}
+
+    loop {
+      let new_message = message_port.recv();
+      if new_message == ~"EOF" {
+        io::println("socket closed");
+        break;
+      } else { 
+        io::println(new_message);
+      }
+    }
+
+    }

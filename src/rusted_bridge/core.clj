@@ -16,11 +16,20 @@
   (proxy [ SimpleChannelUpstreamHandler] []
     (channelConnected [ctx e]
       (println "channel connected event"))
-    (messageReceived [ctx e]
-      (let [msg (.getMessage e)]
-        (-> (.getChannel ctx) (.write msg))))
+    (messageReceived [ctx e]      
+      (let [msg (.getMessage e)
+            _ (def *tuna* (.getChannel ctx))
+            write-future (-> (.getChannel ctx) (.write msg))]
+        #_(.addListener write-future (proxy [ChannelFutureListener] []
+                                       (operationComplete [future]
+                                                          (println "the write has completed")
+                                         (-> (.getChannel future)
+                                             (.disconnect)))))
+        ))    
     (exceptionCaught [ctx e]
-      (println "exception was encountered :("))))
+      (println "exception was encountered :("))
+    (channelDisconnected [ctx e]
+      (println "channel disconnected"))))
 
 (defn start-netty-server []
   (let [ch-factory (NioServerSocketChannelFactory. (Executors/newCachedThreadPool)
@@ -29,7 +38,7 @@
         pl-factory      (reify ChannelPipelineFactory
                           (getPipeline [this]
                             (doto (Channels/pipeline)
-                              (.addLast "handler"  (make-handler )))))]
+                              (.addLast "handler"  (make-handler)))))]
     (.setPipelineFactory bootstrap pl-factory)
     (.setOption bootstrap "child.tcpNoDelay" true)
     (.setOption bootstrap "child.keepAlive" true)
@@ -37,9 +46,20 @@
 
 
 (comment
-
+  (import 'io.netty.buffer.ChannelBuffers )
+         
+  (.write *tuna*
+          (io.netty.buffer.ChannelBuffers/copiedBuffer "answer me!" (java.nio.charset.Charset/forName "UTF-8")))
+  
+  (.disconnect *tuna*)
+  
+  (.toString *chicken*   (java.nio.charset.Charset/forName "UTF-8"))
   (def server (start-netty-server))
   
-
   (.close server)
+
+  (import 'java.nio.charset.Charset)
+  (.toString chicken   (java.nio.charset.Charset/forName "UTF-8"))
+  
+  (java.nio.charset.Charset/forName "UTF-8")
   )
