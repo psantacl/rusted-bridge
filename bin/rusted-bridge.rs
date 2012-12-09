@@ -157,9 +157,9 @@ fn main() {
     io::println(#fmt("port is %s", *props.get(@~"port")));
 
     let io_task = uv::global_loop::get();
-    let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr("127.0.0.1"), 
-                         option::unwrap(uint::from_str(*props.get(@~"port"))),
-                          io_task); 
+    let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr(*props.get(@~"host")), 
+                                                                                                           option::unwrap(uint::from_str(*props.get(@~"port"))),
+                                                                                                           io_task); 
     if conn_res.is_err() {
         fail ~"failed to connect to socket"
     }
