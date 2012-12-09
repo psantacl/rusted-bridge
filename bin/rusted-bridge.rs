@@ -5,7 +5,7 @@ use libc::{c_char, c_int, size_t};
 
 mod property_file {
 
-    priv fn process_line( line : *libc::types::os::arch::c95::c_char, properties : std::map::HashMap<*libc::c_char, *libc::c_char> ) -> ()  {
+    priv fn process_line( line : *libc::types::os::arch::c95::c_char, properties : std::map::HashMap<@~str,@~str>) -> ()  {
         do str::as_c_str("=") |c_equals| {
             unsafe {
                 let k_token = libc::funcs::c95::string::strtok(line, c_equals);
@@ -19,7 +19,9 @@ mod property_file {
                                                                 (libc::funcs::c95::string::strlen(v_token) - 1) as uint) as *libc::c_void, 
                                                                 0,
                                                                 1);
-                    properties.insert(k_token,v_token);
+                    
+                    properties.insert(@str::raw::from_c_str(k_token),
+                                      @str::raw::from_c_str(v_token));
                 }
             }
         }
@@ -77,7 +79,7 @@ mod property_file {
         return (read_buffer as *libc::c_char, finished_reading);
    } 
 
-    pub fn read_file(p: Path) -> std::map::HashMap<*libc::c_char, *libc::c_char> {
+    pub fn read_file(p: Path) -> std::map::HashMap<@~str,@~str> {
         let properties = std::map::HashMap();
         //let r: Result<io::Reader,~str> = io::file_reader(&p); // r is result<reader, err_str>
         //if r.is_err() {
@@ -126,6 +128,7 @@ use std::uv_iotask;
 use std::net_tcp;
 use std::net_ip::v4;
 use std::uv;
+use str::raw::from_c_str;
 
 fn main() {
     //let args: ~[~str] = os::args();
@@ -140,14 +143,18 @@ fn main() {
 
     //for props.each |k,v| {
     //    unsafe {
-    //        io::println(str::raw::from_c_str(k));
-    //        io::println(str::raw::from_c_str(v));
+    //        io::print(k);
+    //        io::print(" -> ");
+    //        io::print(v);
+    //        io::println("");
     //    }
     //}
 
-
+    //io::println(#fmt("connecting to port %s", port));
     //let our_task : core::task::TaskBuilder = core::task::task();
     //let our_io_task : std::uv_iotask::IoTask  = std::uv_iotask::spawn_iotask(our_task);
+      
+    io::println(#fmt("port is %s", *props.get(@~"port")));
 
     let io_task = uv::global_loop::get();
     let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr("127.0.0.1"), 9000, io_task); 
@@ -163,7 +170,8 @@ fn main() {
     loop {
       let read_res = socket_conn.read(0u);
       if read_res.is_err()  {
-        let err_data = read_res.get_err();
+        //let err_data = read_res.get_err();
+        let err_data = result::unwrap_err(read_res);
         if err_data.err_name == ~"EOF" {
           break;
         } else {

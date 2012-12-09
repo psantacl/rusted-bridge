@@ -1,2 +1,3 @@
-port=7711
+port=9000
+host=localhost
 java=run some java
