@@ -79,7 +79,7 @@ mod property_file {
         return (read_buffer as *libc::c_char, finished_reading);
    } 
 
-    pub fn read_file(p: Path) -> std::map::HashMap<@~str,@~str> {
+    pub fn read_file(input_file: ~str) -> std::map::HashMap<@~str,@~str> {
         let properties = std::map::HashMap();
         //let r: Result<io::Reader,~str> = io::file_reader(&p); // r is result<reader, err_str>
         //if r.is_err() {
@@ -96,14 +96,14 @@ mod property_file {
         //    io::println(nextLine);
         //}
 
-        let file_name = str::as_c_str(p.to_str(), { |file_name| file_name });
+        let file_name = str::as_c_str(input_file, { |file_name| file_name });
         let file_mode = str::as_c_str("r", { |file_mode| file_mode });
         let stream = libc::funcs::c95::stdio::fopen(file_name , file_mode);
         let mut finished_reading : bool = false;
         let mut next_line : *libc::c_char;
 
         if ptr::is_null(stream)  {
-            fail #fmt("Error: Couldn't locate config file: %s", p.to_str());
+            fail #fmt("Error: Couldn't locate config file: %s", input_file);
         }
 
         while !finished_reading {
@@ -130,6 +130,39 @@ use std::net_ip::v4;
 use std::uv;
 use str::raw::from_c_str;
 
+use core::result::{Ok,Err};
+use std::getopts::{optopt, getopts, opt_maybe_str, fail_str };
+
+fn determine_input_file() -> (~str) {
+  let opts = ~[ optopt("i") ];
+  let args = os::args();
+
+  //enum Shape {
+  //  Circle(int),
+  //  Rectangle(float)
+  //};
+  //let chicken = Rectangle(4.0);
+  //match chicken {
+  //  Circle(_) => unsafe { io::println("its a circle") },
+  //  Rectangle(_) => unsafe { io::println("its a square") }
+  //}
+
+  let matches = match getopts(vec::tail(args), opts) {
+    result::Ok(m)  => { copy m }
+    result::Err(f) => { fail fail_str(copy f) }
+   };
+
+  let input_file = match opt_maybe_str(matches, "i" ) {
+    option::Some(s) => { copy s }
+    option::None() => { core::os::getcwd().push(".rusted-bridge").to_str() } 
+
+  };
+
+  io::println( #fmt("input file: %s", input_file )); 
+
+  return input_file;
+}
+
 fn main() {
     //let args: ~[~str] = os::args();
     //if args.len() == 1 {
@@ -137,9 +170,10 @@ fn main() {
     //}
     //let p: Path = path::Path(args[1]);
 
-    let p: Path = core::os::getcwd().push(".rusted-bridge");
+    let input_file: ~str= determine_input_file();
+    //let p: Path = core::os::getcwd().push(".rusted-bridge");
 
-    let props = property_file::read_file(p);
+    let props = property_file::read_file(input_file);
 
     //for props.each |k,v| {
     //    unsafe {
