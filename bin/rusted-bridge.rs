@@ -134,7 +134,7 @@ use core::result::{Ok,Err};
 use std::getopts::{optopt, getopts, opt_maybe_str, fail_str };
 
 fn determine_input_file() -> (~str) {
-  let opts = ~[ optopt("i") ];
+  let opts = ~[ optopt("c") ];
   let args = os::args();
 
   //enum Shape {
@@ -152,7 +152,7 @@ fn determine_input_file() -> (~str) {
     result::Err(f) => { fail fail_str(copy f) }
    };
 
-  let input_file = match opt_maybe_str(matches, "i" ) {
+  let input_file = match opt_maybe_str(matches, "c" ) {
     option::Some(s) => { copy s }
     option::None() => { core::os::getcwd().push(".rusted-bridge").to_str() } 
 
