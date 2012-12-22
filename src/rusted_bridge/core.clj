@@ -19,6 +19,7 @@
     (messageReceived [ctx e]      
       (let [msg (.getMessage e)
             _ (def *tuna* (.getChannel ctx))
+            _ (def *msg* msg)
             write-future (-> (.getChannel ctx) (.write msg))]
         #_(.addListener write-future (proxy [ChannelFutureListener] []
                                        (operationComplete [future]
@@ -46,6 +47,7 @@
 
 
 (comment
+
   (import 'io.netty.buffer.ChannelBuffers )
          
   (.write *tuna*
@@ -53,7 +55,7 @@
   
   (.disconnect *tuna*)
   
-  (.toString *chicken*   (java.nio.charset.Charset/forName "UTF-8"))
+  (.toString *msg*   (java.nio.charset.Charset/forName "UTF-8"))
   (def server (start-netty-server))
   
   (.close server)

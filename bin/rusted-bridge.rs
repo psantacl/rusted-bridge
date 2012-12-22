@@ -132,6 +132,7 @@ use str::raw::from_c_str;
 
 use core::result::{Ok,Err};
 use std::getopts::{optopt, getopts, opt_maybe_str, fail_str };
+use std::json::{ToJson};
 
 fn parse_cmd_arguments() -> (~str,~str) {
   let opts = ~[ optopt("c") ];
@@ -203,7 +204,9 @@ fn main() {
         fail ~"failed to connect to socket"
     }
     let socket_conn = core::result::unwrap(conn_res);
-    let write_res = socket_conn.write(core::str::to_bytes("is there anybody there in this electronic void?"));
+    let bridge_cmd_json = bridge_cmd.to_json().to_str();
+
+    let write_res = socket_conn.write( core::str::to_bytes(bridge_cmd_json) );
     if write_res.is_err() {
       fail ~"error sending command over socket"
     }
