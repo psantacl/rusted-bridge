@@ -133,10 +133,9 @@ use str::raw::from_c_str;
 use core::result::{Ok,Err};
 use std::getopts::{optopt, getopts, opt_maybe_str, fail_str };
 
-fn determine_input_file() -> (~str) {
+fn parse_cmd_arguments() -> (~str,~str) {
   let opts = ~[ optopt("c") ];
   let args = os::args();
-
   //enum Shape {
   //  Circle(int),
   //  Rectangle(float)
@@ -152,16 +151,21 @@ fn determine_input_file() -> (~str) {
     result::Err(f) => { fail fail_str(copy f) }
    };
 
-  let input_file = match opt_maybe_str(matches, "c" ) {
+  let input_file = match opt_maybe_str(copy matches, "c" ) {
     option::Some(s) => { copy s }
     option::None() => { core::os::getcwd().push(".rusted-bridge").to_str() } 
 
   };
+  
+  if (vec::is_empty(matches.free)) {
+    fail ~"please specify a command to send over the bridge"
+  }
 
-  io::println( #fmt("input file: %s", input_file )); 
+  let bridge_cmd = matches.free.foldl( ~"", |accum,e| str::append(copy *accum, str::append( ~"/",  *e) ) );
 
-  return input_file;
+  return (input_file, bridge_cmd);
 }
+
 
 fn main() {
     //let args: ~[~str] = os::args();
@@ -170,8 +174,9 @@ fn main() {
     //}
     //let p: Path = path::Path(args[1]);
 
-    let input_file: ~str= determine_input_file();
-    //let p: Path = core::os::getcwd().push(".rusted-bridge");
+    let (input_file,bridge_cmd) = parse_cmd_arguments();
+    io::println( #fmt("input file: %s", input_file )); 
+    io::println( #fmt("cmd: %s", bridge_cmd)); 
 
     let props = property_file::read_file(input_file);
 
@@ -188,7 +193,7 @@ fn main() {
     //let our_task : core::task::TaskBuilder = core::task::task();
     //let our_io_task : std::uv_iotask::IoTask  = std::uv_iotask::spawn_iotask(our_task);
       
-    io::println(#fmt("port is %s", *props.get(@~"port")));
+    io::println(#fmt("port: %s", *props.get(@~"port")));
 
     let io_task = uv::global_loop::get();
     let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr(*props.get(@~"host")), 
@@ -206,7 +211,6 @@ fn main() {
     loop {
       let read_res = socket_conn.read(0u);
       if read_res.is_err()  {
-        //let err_data = read_res.get_err();
         let err_data = result::unwrap_err(read_res);
         if err_data.err_name == ~"EOF" {
           break;
