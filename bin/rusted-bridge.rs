@@ -147,7 +147,7 @@ fn determine_input_file() -> (~str) {
   //  Rectangle(_) => unsafe { io::println("its a square") }
   //}
 
-  let matches = match getopts(vec::tail(args), opts) {
+  let matches = match getopts(vec::view(args, 1, args.len()), opts) {
     result::Ok(m)  => { copy m }
     result::Err(f) => { fail fail_str(copy f) }
    };
