@@ -1,6 +1,7 @@
-(ns rusted-bridge.core
+(ns rusted-bridge.server
   (:require
-   [clojure.data.json :as json])
+   [clojure.data.json      :as json]
+   [rusted-bridge.commands :as commands])
   (:use
    [clj-etl-utils.lang-utils :only [raise]])  
   (:import
@@ -12,7 +13,6 @@
    [java.net InetSocketAddress]
    [java.util.concurrent Executors]))
 
-
 (def config {:port 9000})
 
 (defn make-handler []
@@ -21,21 +21,19 @@
       (println "channel connected event"))
     (messageReceived [ctx e]      
       (let [msg (.getMessage e)
-            _ (def *tuna* (.getChannel ctx))
-            _ (def *msg* msg)
-            write-future (-> (.getChannel ctx)
-                             (.write (io.netty.buffer.ChannelBuffers/copiedBuffer
-                                      "nice to meet you"
-                                      (java.nio.charset.Charset/forName "UTF-8"))))]
+            write-future (-> (.getChannel ctx)                             
+                             (.write
+                              (io.netty.buffer.ChannelBuffers/copiedBuffer
+                               (commands/dispatch-command msg)
+                               (java.nio.charset.Charset/forName "UTF-8"))))]
         (.addListener write-future (proxy [ChannelFutureListener] []
-                                       (operationComplete [future]
-                                         (println "the write has completed")
-                                         (-> (.getChannel future)
-                                             (.disconnect)))))))
+                                     (operationComplete [future]
+                                       (println "the write has completed")
+                                       (-> (.getChannel future)
+                                           (.disconnect)))))))
     
     (exceptionCaught [ctx ex]
-      (def *ex* ex)
-      (println "exception was encountered :("))
+      (raise ex))
     (channelDisconnected [ctx e]
       (println "channel disconnected"))))
 
@@ -44,23 +42,11 @@
     (decode [ctx channel buffer]
       (let [bytes       (.readBytes buffer  (.readableBytes buffer))
             cmd-json    (.toString bytes (java.nio.charset.Charset/forName "UTF-8"))]
-        (def *laser* cmd-json)
         (try
           (json/read-str cmd-json)
         (catch Exception ex
           nil))))))
 
-
-(comment
-
-  (def server (start-netty-server))
-  
-  (.close server)
-  
-  (.getCause  *ex*)
-
-
-  )
 (defn start-netty-server []
   (let [ch-factory (NioServerSocketChannelFactory. (Executors/newCachedThreadPool)
                                                    (Executors/newCachedThreadPool))
@@ -77,22 +63,21 @@
 
 
 (comment
-
-  (import 'io.netty.buffer.ChannelBuffers )
+  (import 'io.netty.buffer.ChannelBuffers)
   
   (.write *tuna*
           (io.netty.buffer.ChannelBuffers/copiedBuffer "answer me!" (java.nio.charset.Charset/forName "UTF-8")))
   
   (.disconnect *tuna*)
   
-  (.toString *msg*   (java.nio.charset.Charset/forName "UTF-8"))
+  (.toString *msg*  (java.nio.charset.Charset/forName "UTF-8"))
   
-  (def server (start-netty-server))
-  
+  (def server (start-netty-server))  
   (.close server)
 
   (import 'java.nio.charset.Charset)
   (.toString chicken   (java.nio.charset.Charset/forName "UTF-8"))
   
   (java.nio.charset.Charset/forName "UTF-8")
+  
   )
