@@ -176,8 +176,8 @@ fn main() {
     //let p: Path = path::Path(args[1]);
 
     let (input_file,bridge_cmd) = parse_cmd_arguments();
-    io::println( #fmt("input file: %s", input_file )); 
-    io::println( #fmt("cmd: %s", bridge_cmd)); 
+    //io::println( #fmt("input file: %s", input_file )); 
+    //io::println( #fmt("cmd: %s", bridge_cmd)); 
 
     let props = property_file::read_file(input_file);
 
@@ -194,7 +194,7 @@ fn main() {
     //let our_task : core::task::TaskBuilder = core::task::task();
     //let our_io_task : std::uv_iotask::IoTask  = std::uv_iotask::spawn_iotask(our_task);
       
-    io::println(#fmt("port: %s", *props.get(@~"port")));
+    //io::println(#fmt("port: %s", *props.get(@~"port")));
 
     let io_task = uv::global_loop::get();
     let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr(*props.get(@~"host")), 
