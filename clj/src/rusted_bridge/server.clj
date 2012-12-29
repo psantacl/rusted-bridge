@@ -72,7 +72,7 @@
   
   (.toString *msg*  (java.nio.charset.Charset/forName "UTF-8"))
   
-  (def server (start-netty-server))  
+  (def server (start-netty-server))
   (.close server)
 
   (import 'java.nio.charset.Charset)
