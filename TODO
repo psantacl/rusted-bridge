@@ -1,0 +1,5 @@
+server should respond with json
+client should parse json response
+start up jvm and poll on connection port
+outfit a program
+
