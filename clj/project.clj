@@ -1,5 +1,5 @@
-(defproject rusted-bridge "1.0.0-SNAPSHOT"
-  :description "FIXME: write description"
+(defproject org.wol/rusted-bridge "1.0.0-SNAPSHOT"
+  :description "later"
   :dependencies [[org.clojure/clojure "1.4.0" ] 
                  [org.clojure/data.json "0.2.0"]
                  [io.netty/netty "4.0.0.Alpha1-SNAPSHOT"]
