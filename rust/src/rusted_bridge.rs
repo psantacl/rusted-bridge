@@ -131,15 +131,6 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
   fn parse_cmd_arguments() -> (~str,~str) {
     let opts = ~[ optopt("c") ];
     let args = os::args();
-    //enum Shape {
-    //  Circle(int),
-    //  Rectangle(float)
-    //};
-    //let chicken = Rectangle(4.0);
-    //match chicken {
-    //  Circle(_) => unsafe { io::println("its a circle") },
-    //  Rectangle(_) => unsafe { io::println("its a square") }
-    //}
 
     let matches = match getopts(vec::view(args, 1, args.len()), opts) {
       result::Ok(m)  => { copy m }
@@ -163,15 +154,7 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
 
 
   fn main() {
-    //let args: ~[~str] = os::args();
-    //if args.len() == 1 {
-    //    fail #fmt("usage: %s <filename>", args[0]);
-    //}
-    //let p: Path = path::Path(args[1]);
-
     let (input_file,bridge_cmd) = parse_cmd_arguments();
-    //io::println( #fmt("input file: %s", input_file )); 
-    //io::println( #fmt("cmd: %s", bridge_cmd)); 
 
     let props = wol::property_file::read_file(input_file);
 
