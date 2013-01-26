@@ -1,5 +1,4 @@
 server should respond with json
 client should parse json response
-start up jvm and poll on connection port
-outfit a program
-
+support blank lines in props file
+emit pid file after fork

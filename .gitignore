@@ -7,3 +7,5 @@
 /checkouts
 /.lein-deps-sum
 *~
+pid_file.txt
+/rust/bin/*

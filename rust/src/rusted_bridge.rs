@@ -14,6 +14,8 @@ use std::getopts::{optopt, getopts, opt_maybe_str, fail_str };
 use std::json::{ToJson};
 use libc::{c_char};
 
+use io::WriterUtil;
+
 enum LoadStrategy {
   JarStrategy(~str),
   ClassPathStrategy(~str,~str) 
@@ -68,8 +70,22 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
     }
   }
 
-  //NB> should produce pid file between fork and exec
+  fn produce_pid_file() -> () {
+    let our_pid = libc::funcs::posix88::unistd::getpid();
+
+    let w: Result<io::Writer,~str> = io::buffered_file_writer(&path::Path("pid_file.txt")); 
+    if w.is_err() {
+      io::println(~"unable to open pid.txt for writing");
+      return;
+    }
+
+    let wrt: io::Writer = w.get();
+    wrt.write_int(our_pid as int);
+  }
+
   fn daemonize(strategy: &LoadStrategy) -> () {
+    produce_pid_file();
+
     match *strategy {
       JarStrategy(location) => { run_jar_strategy(location) }
       ClassPathStrategy(cp,main_class) => { run_cp_strategy(cp,main_class) }
@@ -207,3 +223,10 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
       io::println(core::str::from_bytes(core::result::unwrap(read_res)));
     }
   }
+
+
+
+//jar=/Users/psantaclara/development/relay/dev-utils/aws/aws-1.0.0-SNAPSHOT-standalone.jar
+//main.class=aws.core
+//classpath=/Users/psantaclara/development/relay/dev-utils/aws/test:/Users/psantaclara/development/relay/dev-utils/aws/test-resources:/Users/psantaclara/development/relay/dev-utils/aws/src:/Users/psantaclara/development/relay/dev-utils/aws/classes:/Users/psantaclara/development/relay/dev-utils/aws/resources:/Users/psantaclara/.m2/repository/com/amazonaws/aws-java-sdk/1.3.6/aws-java-sdk-1.3.6.jar:/Users/psantaclara/.m2/repository/commons-codec/commons-codec/1.3/commons-codec-1.3.jar:/Users/psantaclara/.m2/repository/commons-httpclient/commons-httpclient/3.1/commons-httpclient-3.1.jar:/Users/psantaclara/.m2/repository/commons-io/commons-io/2.0/commons-io-2.0.jar:/Users/psantaclara/.m2/repository/commons-lang/commons-lang/2.5/commons-lang-2.5.jar:/Users/psantaclara/.m2/repository/commons-logging/commons-logging/1.1.1/commons-logging-1.1.1.jar:/Users/psantaclara/.m2/repository/io/netty/netty/4.0.0.Alpha1-SNAPSHOT/netty-4.0.0.Alpha1-SNAPSHOT.jar:/Users/psantaclara/.m2/repository/joda-time/joda-time/1.6.2/joda-time-1.6.2.jar:/Users/psantaclara/.m2/repository/log4j/log4j/1.2.14/log4j-1.2.14.jar:/Users/psantaclara/.m2/repository/org/apache/httpcomponents/httpclient/4.2.2/httpclient-4.2.2.jar:/Users/psantaclara/.m2/repository/org/apache/httpcomponents/httpcore/4.2.2/httpcore-4.2.2.jar:/Users/psantaclara/.m2/repository/org/clojars/kyleburton/clj-etl-utils/1.3.4/clj-etl-utils-1.3.4.jar:/Users/psantaclara/.m2/repository/org/clojure/clojure/1.3.0/clojure-1.3.0.jar:/Users/psantaclara/.m2/repository/org/clojure/core.incubator/0.1.0/core.incubator-0.1.0.jar:/Users/psantaclara/.m2/repository/org/clojure/data.json/0.2.0/data.json-0.2.0.jar:/Users/psantaclara/.m2/repository/org/clojure/java.classpath/0.2.0/java.classpath-0.2.0.jar:/Users/psantaclara/.m2/repository/org/clojure/tools.cli/0.2.1/tools.cli-0.2.1.jar:/Users/psantaclara/.m2/repository/org/clojure/tools.logging/0.2.3/tools.logging-0.2.3.jar:/Users/psantaclara/.m2/repository/org/codehaus/jackson/jackson-core-asl/1.9.11/jackson-core-asl-1.9.11.jar:/Users/psantaclara/.m2/repository/org/codehaus/jackson/jackson-mapper-asl/1.9.11/jackson-mapper-asl-1.9.11.jar:/Users/psantaclara/.m2/repository/org/mindrot/jbcrypt/0.3m/jbcrypt-0.3m.jar:/Users/psantaclara/.m2/repository/org/wol/rusted-bridge/1.0.0-SNAPSHOT/rusted-bridge-1.0.0-20130106.192254-1.jar:/Users/psantaclara/development/relay/dev-utils/aws/lib/dev/cdt-1.2.6.2.jar:/Users/psantaclara/development/relay/dev-utils/aws/lib/dev/clj-stacktrace-0.2.4.jar:/Users/psantaclara/development/relay/dev-utils/aws/lib/dev/debug-repl-0.3.1.jar:/Users/psantaclara/development/relay/dev-utils/aws/lib/dev/swank-clojure-1.4.2.jar
+
