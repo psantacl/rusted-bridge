@@ -1,4 +1,3 @@
 server should respond with json
 client should parse json response
 support blank lines in props file
-emit pid file after fork
