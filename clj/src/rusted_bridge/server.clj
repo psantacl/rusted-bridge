@@ -17,8 +17,7 @@
 
 (defn make-handler []
   (proxy [SimpleChannelUpstreamHandler] []
-    (channelConnected [ctx e]
-      (println "channel connected event"))
+    (channelConnected [ctx e])
     (messageReceived [ctx e]      
       (let [msg (.getMessage e)
             write-future (-> (.getChannel ctx)                             
@@ -28,14 +27,12 @@
                                (java.nio.charset.Charset/forName "UTF-8"))))]
         (.addListener write-future (proxy [ChannelFutureListener] []
                                      (operationComplete [future]
-                                       (println "the write has completed")
                                        (-> (.getChannel future)
                                            (.disconnect)))))))
     
     (exceptionCaught [ctx ex]
       (raise ex))
-    (channelDisconnected [ctx e]
-      (println "channel disconnected"))))
+    (channelDisconnected [ctx e])))
 
 (defn make-decoder []
   (proxy [FrameDecoder] []
