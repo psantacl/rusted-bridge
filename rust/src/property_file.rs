@@ -7,20 +7,21 @@ use libc::{c_char, c_int, size_t};
 priv fn process_line( line : *libc::types::os::arch::c95::c_char, properties : std::map::HashMap<@~str,@~str>) -> ()  {
   do str::as_c_str("=") |c_equals| {
     unsafe {
-      let k_token = libc::funcs::c95::string::strtok(line, c_equals);
-      //line is not a valid property(key=value)
-      if ptr::is_null(k_token) {
+      if (ptr::is_null(libc::funcs::c95::string::strchr(line, (*c_equals) as c_int))) {
         libc::funcs::c95::stdlib::free(line as *core::libc::types::common::c95::c_void);
-      } else {
+      } else  {
+      //if ptr::is_null(k_token) {
+      //  //line is not a valid property(key=value)
+      //  libc::funcs::c95::stdlib::free(line as *core::libc::types::common::c95::c_void);
+      //} 
+        let k_token = libc::funcs::c95::string::strtok(line, c_equals);
         let v_token =  libc::funcs::c95::string::strtok( ptr::null(), c_equals);
         //remove trailing newline
-        libc::funcs::c95::string::memset(ptr::offset(v_token, 
-              (libc::funcs::c95::string::strlen(v_token) - 1) as uint) as *libc::c_void, 
-            0,
-            1);
+        libc::funcs::c95::string::memset(ptr::offset(v_token, (libc::funcs::c95::string::strlen(v_token) - 1) as uint) as *libc::c_void, 
+                                          0,
+                                          1);
 
-        properties.insert(@str::raw::from_c_str(k_token),
-            @str::raw::from_c_str(v_token));
+        properties.insert(@str::raw::from_c_str(k_token), @str::raw::from_c_str(v_token));
       }
     }
   }
@@ -31,7 +32,6 @@ priv fn read_line(file_stream : *libc::types::common::c95::FILE) -> (*libc::c_ch
   let mut read_block_size  : int = read_block_increment;
   let mut line_read        : bool = false;
   let mut finished_reading : bool = false;
-  let c_newline = str::as_c_str("\n", { |burger| burger });
   let mut read_buffer = libc::funcs::c95::stdlib::malloc(read_block_size as core::libc::types::os::arch::c95::size_t);
 
   if ptr::is_null(read_buffer)  {
@@ -42,9 +42,7 @@ priv fn read_line(file_stream : *libc::types::common::c95::FILE) -> (*libc::c_ch
 
   while !line_read {
     unsafe {
-      let next_chunk = libc::funcs::c95::stdio::fgets(read_buffer as *mut libc::c_char,
-          read_block_size as libc::c_int,
-          file_stream);
+      let next_chunk = libc::funcs::c95::stdio::fgets(read_buffer as *mut libc::c_char, read_block_size as libc::c_int, file_stream);
       //eof encountered, no bytes read
       if ptr::is_null(next_chunk)  {
         finished_reading = true;
@@ -56,22 +54,23 @@ priv fn read_line(file_stream : *libc::types::common::c95::FILE) -> (*libc::c_ch
         break;
       }
 
-      let nl_char = libc::funcs::c95::string::strchr(next_chunk, *c_newline as libc::c_int);
+      do str::as_c_str("\n") |c_newline| {
+        let nl_char = libc::funcs::c95::string::strchr(next_chunk, *c_newline as libc::c_int);
+        if ptr::is_null(nl_char) {
+          read_block_size += read_block_increment;
 
-      if ptr::is_null(nl_char) {
-        read_block_size += read_block_increment;
+          let new_buffer = libc::funcs::c95::stdlib::realloc(read_buffer, read_block_size as libc::size_t);
 
-        let new_buffer = libc::funcs::c95::stdlib::realloc(read_buffer, read_block_size as libc::size_t);
+          if ptr::is_null(new_buffer)  {
+            fail(#fmt("failed to realloc read buffer to size %d", read_block_size));
+          }
 
-        if ptr::is_null(new_buffer)  {
-          fail(#fmt("failed to realloc read buffer to size %d", read_block_size));
+          read_buffer = new_buffer;
+
+          libc::funcs::c95::stdio::fseek( file_stream, file_position, 0);
+        } else {
+          line_read = true;
         }
-
-        read_buffer = new_buffer;
-
-        libc::funcs::c95::stdio::fseek( file_stream, file_position, 0);
-      } else {
-        line_read = true;
       }
     }
   }
@@ -111,13 +110,11 @@ pub fn read_file(input_file: ~str) -> std::map::HashMap<@~str,@~str> {
   let mut finished_reading : bool = false;
   let mut next_line : *libc::c_char;
 
-
   while !finished_reading {
     match read_line(stream) {
-      (x,y) => {
-        next_line = x;
-        finished_reading = y;
-      }
+      (x,y) =>  { next_line = x;
+                  finished_reading = y;
+                }
     }
     if !ptr::is_null(next_line) {
       process_line(next_line, properties);
