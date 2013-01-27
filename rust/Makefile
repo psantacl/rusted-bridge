@@ -9,3 +9,6 @@ clean:
 
 install:
 	cp bin/rusted-bridge ~/bin/
+
+uninstall:
+	rm ~/bin/rusted-bridge
