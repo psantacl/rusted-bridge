@@ -75,7 +75,7 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
 
     let w: Result<io::Writer,~str> = io::buffered_file_writer(&path::Path("pid_file.txt")); 
     if w.is_err() {
-      io::println(~"unable to open pid.txt for writing");
+      io::println(~"unable to open pid_file.txt for writing");
       return;
     }
 

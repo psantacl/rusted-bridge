@@ -78,6 +78,14 @@ priv fn read_line(file_stream : *libc::types::common::c95::FILE) -> (*libc::c_ch
   return (read_buffer as *libc::c_char, finished_reading);
 } 
 
+priv fn open_stream(input_file: ~str) -> *libc::types::common::c95::FILE {
+  do str::as_c_str(input_file) |file_name|  {
+    do str::as_c_str("r") |file_mode| {
+      libc::funcs::c95::stdio::fopen(file_name , file_mode)
+    }
+  }
+}
+
 pub fn read_file(input_file: ~str) -> std::map::HashMap<@~str,@~str> {
   let properties = std::map::HashMap();
   //let r: Result<io::Reader,~str> = io::file_reader(&p); // r is result<reader, err_str>
@@ -95,9 +103,7 @@ pub fn read_file(input_file: ~str) -> std::map::HashMap<@~str,@~str> {
   //    io::println(nextLine);
   //}
 
-  let file_name = str::as_c_str(input_file, { |file_name| file_name });
-  let file_mode = str::as_c_str("r", { |file_mode| file_mode });
-  let stream = libc::funcs::c95::stdio::fopen(file_name , file_mode);
+  let stream = open_stream( input_file );
   let mut finished_reading : bool = false;
   let mut next_line : *libc::c_char;
 
