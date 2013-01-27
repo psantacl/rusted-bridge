@@ -6,3 +6,6 @@ all: src/property_file.rs src/rusted_bridge.rs
 
 clean:
 	rm -rf bin/*
+
+install:
+	cp bin/rusted-bridge ~/bin/
