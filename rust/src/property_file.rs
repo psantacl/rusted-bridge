@@ -81,7 +81,11 @@ priv fn read_line(file_stream : *libc::types::common::c95::FILE) -> (*libc::c_ch
 priv fn open_stream(input_file: ~str) -> *libc::types::common::c95::FILE {
   do str::as_c_str(input_file) |file_name|  {
     do str::as_c_str("r") |file_mode| {
-      libc::funcs::c95::stdio::fopen(file_name , file_mode)
+      let stream = libc::funcs::c95::stdio::fopen(file_name , file_mode);
+      if ptr::is_null(stream)  {
+        fail #fmt("Error: Couldn't locate config file: %s", input_file);
+      }
+      stream
     }
   }
 }
@@ -107,9 +111,6 @@ pub fn read_file(input_file: ~str) -> std::map::HashMap<@~str,@~str> {
   let mut finished_reading : bool = false;
   let mut next_line : *libc::c_char;
 
-  if ptr::is_null(stream)  {
-    fail #fmt("Error: Couldn't locate config file: %s", input_file);
-  }
 
   while !finished_reading {
     match read_line(stream) {
