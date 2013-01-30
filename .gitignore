@@ -8,6 +8,4 @@
 /.lein-deps-sum
 *~
 pid_file.txt
-/rust/bin/rusted*
-/rust/bin/libwol*
 
