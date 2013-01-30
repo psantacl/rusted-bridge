@@ -79,18 +79,6 @@
 
 (comment
 
-  (defn chicken []
-  (.toLowerCase nil))
-
-
-(defn tuna []
-  (try
-  (chicken)
-  (catch Exception ex
-    (def *burguer* ex)
-    (raise ex))))
-
-  (tuna)
 
   (dispatch-command "HELP")
   

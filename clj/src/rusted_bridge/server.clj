@@ -31,9 +31,44 @@
                                            (.disconnect)))))))
     
     (exceptionCaught [ctx ex]
-      (.printStackTrace ex))    
+      (let [stack-trac  (with-out-str
+                          (.printStackTrace (.getCause ex) (java.io.PrintWriter. *out*)))
+            write-future (-> (.getChannel ctx)                             
+                             (.write
+                              (io.netty.buffer.ChannelBuffers/copiedBuffer
+                               stack-trac
+                               (java.nio.charset.Charset/forName "UTF-8"))))]
+        (.addListener write-future (proxy [ChannelFutureListener] []
+                                     (operationComplete [future]
+                                       (-> (.getChannel future)
+                                           (.disconnect)))))))
+        
+    
     (channelDisconnected [ctx e])))
 
+(comment
+
+  (.getStackTrace (.getCause (second *chicken*)))
+  
+  (with-out-str
+    (.printStackTrace (.getCause (second *chicken*)) (java.io.PrintWriter. *out*)))
+
+
+
+  (class *out*)
+
+  
+
+
+
+  (.printStackTrace (.getCause (second *chicken*)) *err*)
+
+  (.println System/out "foof")
+  (.println System/err "foof")
+  
+  (println "chicken")
+
+  )
 (defn make-decoder []
   (proxy [FrameDecoder] []
     (decode [ctx channel buffer]
@@ -41,8 +76,8 @@
             cmd-json    (.toString bytes (java.nio.charset.Charset/forName "UTF-8"))]
         (try
           (json/read-str cmd-json)
-        (catch Exception ex
-          nil))))))
+          (catch Exception ex
+            nil))))))
 
 (defn start-netty-server []
   (let [ch-factory (NioServerSocketChannelFactory. (Executors/newCachedThreadPool)
@@ -78,3 +113,15 @@
   (java.nio.charset.Charset/forName "UTF-8")
   
   )
+
+
+
+
+
+
+
+
+
+
+
+
