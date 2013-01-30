@@ -31,7 +31,7 @@
                                            (.disconnect)))))))
     
     (exceptionCaught [ctx ex]
-      (raise ex))
+      (.printStackTrace ex))    
     (channelDisconnected [ctx e])))
 
 (defn make-decoder []

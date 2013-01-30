@@ -73,7 +73,25 @@
        :else
        (recur registered-cmds (match-cmd? incoming-cmd (first registered-cmds)))))))
 
+
+
+
+
 (comment
+
+  (defn chicken []
+  (.toLowerCase nil))
+
+
+(defn tuna []
+  (try
+  (chicken)
+  (catch Exception ex
+    (def *burguer* ex)
+    (raise ex))))
+
+  (tuna)
+
   (dispatch-command "HELP")
   
   (def-bridge "aws/elb/:elb/ls/:instance"
