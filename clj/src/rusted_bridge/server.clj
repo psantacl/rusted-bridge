@@ -23,7 +23,8 @@
             write-future (-> (.getChannel ctx)                             
                              (.write
                               (io.netty.buffer.ChannelBuffers/copiedBuffer
-                               (commands/dispatch-command msg)
+                               (with-out-str
+                                 (commands/dispatch-command msg))
                                (java.nio.charset.Charset/forName "UTF-8"))))]
         (.addListener write-future (proxy [ChannelFutureListener] []
                                      (operationComplete [future]
