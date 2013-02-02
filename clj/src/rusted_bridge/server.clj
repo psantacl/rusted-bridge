@@ -54,14 +54,6 @@
   (with-out-str
     (.printStackTrace (.getCause (second *chicken*)) (java.io.PrintWriter. *out*)))
 
-
-
-  (class *out*)
-
-  
-
-
-
   (.printStackTrace (.getCause (second *chicken*)) *err*)
 
   (.println System/out "foof")
