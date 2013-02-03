@@ -5,13 +5,14 @@
   (:use
    [clj-etl-utils.lang-utils :only [raise]])  
   (:import
-   [io.netty.bootstrap ServerBootstrap]
-   [io.netty.channel.socket.nio NioServerSocketChannelFactory]  
-   [io.netty.channel ChannelPipelineFactory Channels SimpleChannelUpstreamHandler ChannelFutureListener]
-   [io.netty.buffer ChannelBuffers]
-   [io.netty.handler.codec.frame FrameDecoder]
+   [org.jboss.netty.bootstrap ServerBootstrap]
+   [org.jboss.netty.channel.socket.nio NioServerSocketChannelFactory]  
+   [org.jboss.netty.channel ChannelPipelineFactory Channels SimpleChannelUpstreamHandler ChannelFutureListener]
+   [org.jboss.netty.buffer ChannelBuffers]
+   [org.jboss.netty.handler.codec.frame FrameDecoder]
    [java.net InetSocketAddress]
    [java.util.concurrent Executors]))
+
 
 (def config {:port 9000})
 
@@ -22,7 +23,7 @@
       (let [msg (.getMessage e)
             write-future (-> (.getChannel ctx)                             
                              (.write
-                              (io.netty.buffer.ChannelBuffers/copiedBuffer
+                              (ChannelBuffers/copiedBuffer
                                (with-out-str
                                  (commands/dispatch-command msg))
                                (java.nio.charset.Charset/forName "UTF-8"))))]
@@ -36,7 +37,7 @@
                           (.printStackTrace (.getCause ex) (java.io.PrintWriter. *out*)))
             write-future (-> (.getChannel ctx)                             
                              (.write
-                              (io.netty.buffer.ChannelBuffers/copiedBuffer
+                              (ChannelBuffers/copiedBuffer
                                stack-trac
                                (java.nio.charset.Charset/forName "UTF-8"))))]
         (.addListener write-future (proxy [ChannelFutureListener] []
@@ -62,6 +63,7 @@
   (println "chicken")
 
   )
+
 (defn make-decoder []
   (proxy [FrameDecoder] []
     (decode [ctx channel buffer]
@@ -71,6 +73,7 @@
           (json/read-str cmd-json)
           (catch Exception ex
             nil))))))
+
 
 (defn start-netty-server []
   (let [ch-factory (NioServerSocketChannelFactory. (Executors/newCachedThreadPool)
