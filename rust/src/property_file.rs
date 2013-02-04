@@ -3,18 +3,18 @@ use std::map;
 use libc::{c_char, c_int, size_t};
 //use io::ReaderUtil;
 
-pub fn print_properties( properties: &std::map::HashMap<@~str,@~str> ) {
+pub fn print_properties( properties: &std::map::HashMap<~str,~str> ) {
     for properties.each |k,v| {
         unsafe {
-            io::print(*k);
+            io::print(k);
             io::print(" -> ");
-            io::print(*v);
+            io::print(v);
             io::println("");
         }
     }
 }
 
-priv fn process_line( line : *libc::types::os::arch::c95::c_char, properties : &std::map::HashMap<@~str,@~str>) -> ()  {
+priv fn process_line( line : *libc::types::os::arch::c95::c_char, properties : &std::map::HashMap<~str,~str>) -> ()  {
   do str::as_c_str("=") |c_equals| {
     unsafe {
       if (ptr::is_null(libc::funcs::c95::string::strchr(line, (*c_equals) as c_int))) {
@@ -31,7 +31,7 @@ priv fn process_line( line : *libc::types::os::arch::c95::c_char, properties : &
                                           0,
                                           1);
 
-        properties.insert(@str::raw::from_c_str(k_token), @str::raw::from_c_str(v_token));
+        properties.insert(str::raw::from_c_str(k_token), str::raw::from_c_str(v_token));
       }
     }
   }
@@ -45,7 +45,7 @@ priv fn read_line(file_stream : *libc::types::common::c95::FILE) -> (*libc::c_ch
   let mut read_buffer = libc::funcs::c95::stdlib::malloc(read_block_size as core::libc::types::os::arch::c95::size_t);
 
   if ptr::is_null(read_buffer)  {
-    fail(#fmt("failed to allocated read buffer of size %d", read_block_size));
+    fail(fmt!("failed to allocated read buffer of size %d", read_block_size));
   }
 
   let file_position = libc::funcs::c95::stdio::ftell(file_stream);
@@ -72,7 +72,7 @@ priv fn read_line(file_stream : *libc::types::common::c95::FILE) -> (*libc::c_ch
           let new_buffer = libc::funcs::c95::stdlib::realloc(read_buffer, read_block_size as libc::size_t);
 
           if ptr::is_null(new_buffer)  {
-            fail(#fmt("failed to realloc read buffer to size %d", read_block_size));
+            fail(fmt!("failed to realloc read buffer to size %d", read_block_size));
           }
 
           read_buffer = new_buffer;
@@ -92,14 +92,14 @@ priv fn open_stream(input_file: ~str) -> *libc::types::common::c95::FILE {
     do str::as_c_str("r") |file_mode| {
       let stream = libc::funcs::c95::stdio::fopen(file_name , file_mode);
       if ptr::is_null(stream)  {
-        fail #fmt("Error: Couldn't locate config file: %s", input_file);
+        fail( fmt!("Error: Couldn't locate config file: %s", input_file) );
       }
       stream
     }
   }
 }
 
-pub fn read_file(properties: &r/std::map::HashMap<@~str,@~str>, input_file: ~str) -> &r/std::map::HashMap<@~str,@~str> {
+pub fn read_file(properties: &r/std::map::HashMap<~str,~str>, input_file: ~str) -> &r/std::map::HashMap<~str,~str> {
   //let r: Result<io::Reader,~str> = io::file_reader(&p); // r is result<reader, err_str>
   //if r.is_err() {
   //    fail result::unwrap_err(r);

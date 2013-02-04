@@ -7,7 +7,7 @@ use std::net_tcp;
 use std::net_ip::v4;
 use std::uv;
 use str::raw::from_c_str;
-
+use str::StrSlice;
 
 use core::result::{Ok,Err};
 use std::getopts::{optopt, getopts, opt_maybe_str, fail_str };
@@ -83,10 +83,10 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
     wrt.write_int(our_pid as int);
   }
 
-  fn daemonize(strategy: &LoadStrategy) -> () {
+  fn daemonize(strategy: LoadStrategy) -> () {
     produce_pid_file();
 
-    match *strategy {
+    match strategy {
       JarStrategy(location) => { run_jar_strategy(location) }
       ClassPathStrategy(cp,main_class) => { run_cp_strategy(cp,main_class) }
     }
@@ -107,20 +107,20 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
       libc::funcs::posix88::unistd::sleep(1);
       count += 1;
     }
-    fail(#fmt("failed to connect to service after %d attempts", count));
+    fail(fmt!("failed to connect to service after %d attempts", count));
   }
 
-  fn ensure_connection(host: &str, port: &str, strategy: LoadStrategy) -> (std::net_tcp::TcpSocket) {
+  fn ensure_connection(host: ~str, port: ~str, strategy: LoadStrategy) -> (std::net_tcp::TcpSocket) {
     let io_task = uv::global_loop::get();
-    let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr(host), 
-        option::unwrap(uint::from_str(port)), 
+    let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr(host.to_managed()), 
+        option::unwrap(uint::from_str(port.to_managed())), 
         io_task);
     if conn_res.is_err() {
       let pid = libc::funcs::posix88::unistd::fork();
       if (pid < 0) {
         fail ~"Error: unable to fork whilst trying to launch jvm"
       } else if (pid == 0) {
-        daemonize(&strategy);
+        daemonize(strategy);
       } else {
         return poll_for_connection(host,port);
       }
@@ -137,7 +137,7 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
       result::Err(f) => { fail fail_str(copy f) }
     };
 
-    let input_file = match opt_maybe_str(copy matches, "c" ) {
+    let input_file = match opt_maybe_str(copy &matches, "c" ) {
       option::Some(s) => { copy s }
       option::None() => { core::os::getcwd().push(".rusted-bridge").to_str() } 
 
@@ -159,26 +159,26 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
 
     wol::property_file::read_file(props, input_file);
 
-    let contains_jar        =  props.find(@~"jar");
-    let contains_classpath  =  props.find(@~"classpath");
-    let contains_main_class =  props.find(@~"main.class");
+    let contains_jar        =  props.find(~"jar");
+    let contains_classpath  =  props.find(~"classpath");
+    let contains_main_class =  props.find(~"main.class");
 
     let strategy = match (contains_jar, contains_classpath, contains_main_class) {
       (None,   None    , None)      => { fail(~"jar or classpath + main class must be specified in properties file.  Neither load strategy found"); }
       (Some(_), Some(_), Some(_))   => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
       (Some(_), Some(_), None)      => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
       (Some(_), None,    Some(_))   => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
-      (Some(r), None, None)         => { JarStrategy(*r) }
+      (Some(r), None, None)         => { JarStrategy(r) }
 
       (None, None,   Some(_))       => { fail(~"main class specified but not classpath") }
       (None, Some(_), None)         => { fail(~"classpath specified but not main class") }
-      (None, Some(r), Some(s))      => { ClassPathStrategy(*r,*s) }
+      (None, Some(r), Some(s))      => { ClassPathStrategy(r,s) }
     };
 
 
     wol::property_file::print_properties(props);
 
-    let socket_conn = ensure_connection( *props.get(@~"host"), *props.get(@~"port"), strategy );
+    let socket_conn = ensure_connection( props.get(~"host"), props.get(~"port"), strategy);
     io::println("connection established!");
     let bridge_cmd_json = bridge_cmd.to_json().to_str();
 
