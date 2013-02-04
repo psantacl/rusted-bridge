@@ -3,8 +3,18 @@ use std::map;
 use libc::{c_char, c_int, size_t};
 //use io::ReaderUtil;
 
+pub fn print_properties( properties: &std::map::HashMap<@~str,@~str> ) {
+    for properties.each |k,v| {
+        unsafe {
+            io::print(*k);
+            io::print(" -> ");
+            io::print(*v);
+            io::println("");
+        }
+    }
+}
 
-priv fn process_line( line : *libc::types::os::arch::c95::c_char, properties : std::map::HashMap<@~str,@~str>) -> ()  {
+priv fn process_line( line : *libc::types::os::arch::c95::c_char, properties : &std::map::HashMap<@~str,@~str>) -> ()  {
   do str::as_c_str("=") |c_equals| {
     unsafe {
       if (ptr::is_null(libc::funcs::c95::string::strchr(line, (*c_equals) as c_int))) {
@@ -89,7 +99,7 @@ priv fn open_stream(input_file: ~str) -> *libc::types::common::c95::FILE {
   }
 }
 
-pub fn read_file(properties: std::map::HashMap<@~str,@~str>, input_file: ~str) -> std::map::HashMap<@~str,@~str> {
+pub fn read_file(properties: &r/std::map::HashMap<@~str,@~str>, input_file: ~str) -> &r/std::map::HashMap<@~str,@~str> {
   //let r: Result<io::Reader,~str> = io::file_reader(&p); // r is result<reader, err_str>
   //if r.is_err() {
   //    fail result::unwrap_err(r);

@@ -155,9 +155,9 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
 
   fn main() {
     let (input_file,bridge_cmd) = parse_cmd_arguments();
-    let properties = std::map::HashMap();
+    let props = ~std::map::HashMap();
 
-    let props = wol::property_file::read_file(properties, input_file);
+    wol::property_file::read_file(props, input_file);
 
     let contains_jar        =  props.find(@~"jar");
     let contains_classpath  =  props.find(@~"classpath");
@@ -175,14 +175,8 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
       (None, Some(r), Some(s))      => { ClassPathStrategy(*r,*s) }
     };
 
-    //for props.each |k,v| {
-    //    unsafe {
-    //        io::print(k);
-    //        io::print(" -> ");
-    //        io::print(v);
-    //        io::println("");
-    //    }
-    //}
+
+    wol::property_file::print_properties(props);
 
     let socket_conn = ensure_connection( *props.get(@~"host"), *props.get(@~"port"), strategy );
     io::println("connection established!");
