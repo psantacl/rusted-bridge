@@ -89,8 +89,7 @@ priv fn open_stream(input_file: ~str) -> *libc::types::common::c95::FILE {
   }
 }
 
-pub fn read_file(input_file: ~str) -> std::map::HashMap<@~str,@~str> {
-  let properties = std::map::HashMap();
+pub fn read_file(properties: std::map::HashMap<@~str,@~str>, input_file: ~str) -> std::map::HashMap<@~str,@~str> {
   //let r: Result<io::Reader,~str> = io::file_reader(&p); // r is result<reader, err_str>
   //if r.is_err() {
   //    fail result::unwrap_err(r);

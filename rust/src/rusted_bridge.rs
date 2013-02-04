@@ -155,8 +155,9 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
 
   fn main() {
     let (input_file,bridge_cmd) = parse_cmd_arguments();
+    let properties = std::map::HashMap();
 
-    let props = wol::property_file::read_file(input_file);
+    let props = wol::property_file::read_file(properties, input_file);
 
     let contains_jar        =  props.find(@~"jar");
     let contains_classpath  =  props.find(@~"classpath");
