@@ -1,3 +1,4 @@
+
 extern mod std;
 extern mod wol;
 
@@ -153,6 +154,7 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
   }
 
 
+#[allow(non_implicitly_copyable_typarams)]
   fn main() {
     let (input_file,bridge_cmd) = parse_cmd_arguments();
     let props = ~std::map::HashMap();
@@ -201,3 +203,4 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
       io::println(core::str::from_bytes(core::result::unwrap(read_res)));
     }
   }
+

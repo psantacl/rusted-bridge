@@ -1,6 +1,7 @@
 #[link(name = "wol", vers = "1.0", author = "psc")];
 #[crate_type = "lib"];
 #[warn(non_camel_case_types)];
+#[allow(non_implicitly_copyable_typarams)]
 
 pub mod property_file;
 extern mod std;
