@@ -79,25 +79,18 @@
 
 
 (comment
-
-
-  (dispatch-command "HELP")
+  ((:handler
+    (get @registry "chicken/ls")))
   
-  (def-bridge "aws/elb/:elb/ls/:instance"
-      "display information about an instance for a given elb"    
-    (format "1. %s" binds))
-
-  (def-bridge "aws/elb/:elb/ls"
-      "display information about an elb"
-    (format "2: %s" binds))
-  
-  registry
+  (keys @registry)
   (reset! registry {})
 
   (dispatch-command "aws/elb/chicken-balancer/ls/happy-node")
   (dispatch-command "aws/elb/chicken-balancer/ls")
   
-  (dispatch-command "command/bad")
-
+  (dispatch-command "chicken/ls")
   )
+  
+  
+  
 

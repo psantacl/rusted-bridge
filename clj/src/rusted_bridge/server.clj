@@ -16,6 +16,7 @@
 
 (def config {:port 9000})
 
+
 (defn make-handler []
   (proxy [SimpleChannelUpstreamHandler] []
     (channelConnected [ctx e])
@@ -27,6 +28,7 @@
                                (with-out-str
                                  (commands/dispatch-command msg))
                                (java.nio.charset.Charset/forName "UTF-8"))))]
+        
         (.addListener write-future (proxy [ChannelFutureListener] []
                                      (operationComplete [future]
                                        (-> (.getChannel future)
@@ -91,23 +93,23 @@
 
 
 (comment
-  (import 'io.netty.buffer.ChannelBuffers)
-  
-  (.write *tuna*
-          (io.netty.buffer.ChannelBuffers/copiedBuffer "answer me!" (java.nio.charset.Charset/forName "UTF-8")))
-  
-  (.disconnect *tuna*)
-  
-  (.toString *msg*  (java.nio.charset.Charset/forName "UTF-8"))
-  
   (def server (start-netty-server))
   (.close server)
 
-  (import 'java.nio.charset.Charset)
-  (.toString chicken   (java.nio.charset.Charset/forName "UTF-8"))
+  (def *chickens* { :paul { :size 44}
+                   :steph {:size 20 :color :brown}})
+    
+  (rusted-bridge.commands/def-bridge "chickens"
+    "list all chickens"    
+    (println *chickens*))
   
-  (java.nio.charset.Charset/forName "UTF-8")
-  
+  (rusted-bridge.commands/def-bridge "chicken/:name"
+      "list infor about a chicken chickens"    
+    (println (get *chickens* (keyword (:name rusted-bridge.commands/binds)))))
+
+  (with-out-str
+    (commands/dispatch-command *tuna*))
+
   )
 
 
