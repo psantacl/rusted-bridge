@@ -178,10 +178,10 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
     };
 
 
-    wol::property_file::print_properties(props);
+    //wol::property_file::print_properties(props);
 
     let socket_conn = ensure_connection( props.get(~"host"), props.get(~"port"), strategy);
-    io::println("connection established!");
+    //io::println("connection established!");
     let bridge_cmd_json = bridge_cmd.to_json().to_str();
 
     let write_res = socket_conn.write( core::str::to_bytes(bridge_cmd_json) );
