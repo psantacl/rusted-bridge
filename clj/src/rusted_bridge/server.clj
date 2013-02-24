@@ -16,8 +16,7 @@
 
 (def config {:port 9000})
 
-
-(defn make-handler []
+(defn make-handler [dispatch-fn]
   (proxy [SimpleChannelUpstreamHandler] []
     (channelConnected [ctx e])
     (messageReceived [ctx e]      
@@ -26,14 +25,13 @@
                              (.write
                               (ChannelBuffers/copiedBuffer
                                (with-out-str
-                                 (commands/dispatch-command msg))
+                                 (commands/dispatch-command msg dispatch-fn))
                                (java.nio.charset.Charset/forName "UTF-8"))))]
-        
         (.addListener write-future (proxy [ChannelFutureListener] []
                                      (operationComplete [future]
                                        (-> (.getChannel future)
                                            (.disconnect)))))))
-    
+       
     (exceptionCaught [ctx ex]
       (let [stack-trac  (with-out-str
                           (.printStackTrace (.getCause ex) (java.io.PrintWriter. *out*)))
@@ -46,23 +44,22 @@
                                      (operationComplete [future]
                                        (-> (.getChannel future)
                                            (.disconnect)))))))
-        
+    
     
     (channelDisconnected [ctx e])))
 
+
 (comment
-
-  (.getStackTrace (.getCause (second *chicken*)))
-  
-  (with-out-str
-    (.printStackTrace (.getCause (second *chicken*)) (java.io.PrintWriter. *out*)))
-
-  (.printStackTrace (.getCause (second *chicken*)) *err*)
-
-  (.println System/out "foof")
-  (.println System/err "foof")
-  
-  (println "chicken")
+  ;;send *out* over socket
+  (binding [*out*  (proxy [java.io.PrintWriter] [System/out]
+                     (write [obj]
+                       (.write
+                        *chicken*
+                        (ChannelBuffers/copiedBuffer
+                         obj
+                         (java.nio.charset.Charset/forName "UTF-8")))
+                       #_(proxy-super write obj)))]
+    (println 33 ))
 
   )
 
@@ -76,8 +73,13 @@
           (catch Exception ex
             nil))))))
 
+(defn valid-keys? [params key-lists]
+  (some  (fn [key-list]
+           (= (set key-list)
+              (set (keys params))))
+         key-lists))
 
-(defn start-netty-server []
+(defn start-server [dispatch-fn]
   (let [ch-factory (NioServerSocketChannelFactory. (Executors/newCachedThreadPool)
                                                    (Executors/newCachedThreadPool))
         bootstrap       (ServerBootstrap. ch-factory)
@@ -85,41 +87,32 @@
                           (getPipeline [this]
                             (doto (Channels/pipeline)
                               (.addLast "decoder"  (make-decoder))
-                              (.addLast "handler"  (make-handler)))))]
+                              (.addLast "handler"  (make-handler dispatch-fn)))))]
     (.setPipelineFactory bootstrap pl-factory)
     (.setOption bootstrap "child.tcpNoDelay" true)
     (.setOption bootstrap "child.keepAlive" true)
     (.bind bootstrap (InetSocketAddress. (:port config)) )))
 
+(defn start-bridge [& opts]
+  (let [opts      (apply array-map opts)
+        keySet    [#{:dispatch-fn}]]
+    (if-not (valid-keys? opts keySet)
+      (println "error: unrecognized options(%s)" opts)
+      (do
+        (start-server (:dispatch-fn opts))))))
 
 (comment
-  (def server (start-netty-server))
-  (.close server)
 
-  (def *chickens* { :paul { :size 44}
-                   :steph {:size 20 :color :brown}})
-    
+
+  
   (rusted-bridge.commands/def-bridge "chickens"
     "list all chickens"    
     (println *chickens*))
   
   (rusted-bridge.commands/def-bridge "chicken/:name"
-      "list infor about a chicken chickens"    
+    "list infor about a chicken chickens"    
     (println (get *chickens* (keyword (:name rusted-bridge.commands/binds)))))
 
-  (with-out-str
-    (commands/dispatch-command *tuna*))
+  ()
 
   )
-
-
-
-
-
-
-
-
-
-
-
-

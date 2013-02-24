@@ -53,32 +53,35 @@
            (format "%s\n\t%s" k (:desc  v)))
          @registry))))
 
-(defn dispatch-command [^String incoming-cmd]
+(defn dispatch-command [^String incoming-cmd dispatch-fn]
   (let [incoming-cmd    (if (.startsWith  incoming-cmd "/")
                           (.substring  incoming-cmd 1)
                           incoming-cmd)]
-    
+
     (loop [[registered-cmd & registered-cmds] (keys @registry)
-           [matches? binds] (match-cmd? incoming-cmd  registered-cmd )]
+           [matches? binds] (or (and registered-cmd
+                                     (match-cmd? incoming-cmd  registered-cmd ))
+                                [false nil])]      
       (cond
         (= (.toLowerCase incoming-cmd) "help")
         (display-help)
-        
-        (and (not matches?) (empty? registered-cmds))
-        (display-usage incoming-cmd)
-        
+
         matches?
         (binding [binds binds]
           ((get-in  @registry [registered-cmd :handler])))
 
+        (and (not matches?) (empty? registered-cmds) (not (nil? dispatch-fn)))
+        (dispatch-fn incoming-cmd)
+
+        (and (not matches?) (empty? registered-cmds) (nil? dispatch-fn))
+        (display-usage incoming-cmd)          
+
         :else
         (recur registered-cmds (match-cmd? incoming-cmd (first registered-cmds)))))))
 
+  (comment
 
 
-
-
-(comment
   ((:handler
     (get @registry "chicken/ls")))
   
@@ -90,7 +93,7 @@
   
   (dispatch-command "chicken/ls")
   )
-  
-  
-  
+
+
+
 
