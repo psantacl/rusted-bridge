@@ -15,23 +15,46 @@
 
 
 (def config {:port 9000})
+(comment
+  
 
+  *chicken*
+  (def *chicken* (atom []))
+  (def *turkey* (java.io.StringWriter.))
+
+  (doseq [chicken @*chicken*]
+    (.write *turkey* chicken))
+  (.toString *turkey*)
+  )
 (defn make-handler [dispatch-fn]
   (proxy [SimpleChannelUpstreamHandler] []
     (channelConnected [ctx e])
-    (messageReceived [ctx e]      
-      (let [msg (.getMessage e)
-            write-future (-> (.getChannel ctx)                             
-                             (.write
-                              (ChannelBuffers/copiedBuffer
-                               (with-out-str
-                                 (commands/dispatch-command msg dispatch-fn))
-                               (java.nio.charset.Charset/forName "UTF-8"))))]
-        (.addListener write-future (proxy [ChannelFutureListener] []
-                                     (operationComplete [future]
-                                       (-> (.getChannel future)
-                                           (.disconnect)))))))
-       
+    (messageReceived [ctx e]
+      (binding [*out* (proxy [java.io.StringWriter] []
+                        (write [obj]
+                          (let [channel (.getChannel ctx)]
+                            (.write
+                             channel
+                             (ChannelBuffers/copiedBuffer
+                              (json/write-str {:command "std-out" :payload
+                                               (do
+                                                 (proxy-super write obj)
+                                                 (proxy-super toString))})
+                              (java.nio.charset.Charset/forName "UTF-8"))))
+                          (let [buffer (.getBuffer this)]
+                            (.delete buffer 0 (.length buffer)))))]
+        
+        (let [msg (.getMessage e)
+              channel (.getChannel ctx)]
+          (commands/dispatch-command msg dispatch-fn)
+          (-> channel
+              (.write (ChannelBuffers/EMPTY_BUFFER))
+              (.addListener (ChannelFutureListener/CLOSE))))))
+    
+    
+    
+    
+    
     (exceptionCaught [ctx ex]
       (let [stack-trac  (with-out-str
                           (.printStackTrace (.getCause ex) (java.io.PrintWriter. *out*)))
@@ -47,6 +70,11 @@
     
     
     (channelDisconnected [ctx e])))
+
+
+
+
+
 
 
 (comment

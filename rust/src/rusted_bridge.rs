@@ -12,8 +12,10 @@ use str::StrSlice;
 
 use core::result::{Ok,Err};
 use std::getopts::{optopt, getopts, opt_maybe_str, fail_str };
-use std::json::{ToJson};
+use std::json::{ToJson,from_str,Error,Json, Object,to_str, Decoder};
 use libc::{c_char};
+use task::spawn;
+use pipes::{stream, Port, Chan};
 
 use io::WriterUtil;
 
@@ -113,9 +115,9 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
 
   fn ensure_connection(host: ~str, port: ~str, strategy: LoadStrategy) -> (std::net_tcp::TcpSocket) {
     let io_task = uv::global_loop::get();
-    let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect(std::net_ip::v4::parse_addr(host.to_managed()), 
-        option::unwrap(uint::from_str(port.to_managed())), 
-        io_task);
+    let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect( std::net_ip::v4::parse_addr(host.to_managed()), 
+                                                                                                            option::unwrap(uint::from_str(port.to_managed())), 
+                                                                                                            io_task);
     if conn_res.is_err() {
       let pid = libc::funcs::posix88::unistd::fork();
       if (pid < 0) {
@@ -154,53 +156,105 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
   }
 
 
-#[allow(non_implicitly_copyable_typarams)]
-  fn main() {
-    let (input_file,bridge_cmd) = parse_cmd_arguments();
-    let props = ~std::map::HashMap();
-
-    wol::property_file::read_file(props, input_file);
-
-    let contains_jar        =  props.find(~"jar");
-    let contains_classpath  =  props.find(~"classpath");
-    let contains_main_class =  props.find(~"main.class");
-
-    let strategy = match (contains_jar, contains_classpath, contains_main_class) {
-      (None,   None    , None)      => { fail(~"jar or classpath + main class must be specified in properties file.  Neither load strategy found"); }
-      (Some(_), Some(_), Some(_))   => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
-      (Some(_), Some(_), None)      => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
-      (Some(_), None,    Some(_))   => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
-      (Some(r), None, None)         => { JarStrategy(r) }
-
-      (None, None,   Some(_))       => { fail(~"main class specified but not classpath") }
-      (None, Some(_), None)         => { fail(~"classpath specified but not main class") }
-      (None, Some(r), Some(s))      => { ClassPathStrategy(r,s) }
-    };
-
-
-    //wol::property_file::print_properties(props);
-
-    let socket_conn = ensure_connection( props.get(~"host"), props.get(~"port"), strategy);
-    //io::println("connection established!");
-    let bridge_cmd_json = bridge_cmd.to_json().to_str();
-
-    let write_res = socket_conn.write( core::str::to_bytes(bridge_cmd_json) );
-    if write_res.is_err() {
-      fail ~"error sending command over socket"
-    }
-
+  #[allow(non_implicitly_copyable_typarams)]
+  fn parse_cmd(socket_buff : std::net_tcp::TcpSocketBuf, std_out_channel : Chan<Option<~str>>) -> () {
+    let mut next_cmd : ~str = ~"";
     loop {
-      let read_res = socket_conn.read(0u);
-      if read_res.is_err()  {
-        let err_data = result::unwrap_err(read_res);
-        if err_data.err_name == ~"EOF" {
-          break;
-        } else {
-          fail ~"error getting response"
-        }
+      //libc::funcs::posix88::unistd::sleep(1);
+      let read_res = socket_buff.read_byte();
+
+      //socket connection was closed
+      if (socket_buff.eof()) {
+        std_out_channel.send(None);
+        break;  
       }
 
-      io::println(core::str::from_bytes(core::result::unwrap(read_res)));
+      let next_char : ~str = core::str::from_byte(read_res as u8);
+      next_cmd = core::str::append(next_cmd, next_char);
+
+      //io::println(fmt!("next_cmd : %s", next_cmd ));
+
+      let parse_result : Result<Json,Error> = std::json::from_str(next_cmd);
+
+      if (!parse_result.is_err()) {
+        //io::println(fmt!("successfully parsed :%s",next_cmd));
+        let json_response = match( core::result::unwrap(parse_result) ) {
+          Object(cmd) => { cmd }
+          _           => { fail(~"received command was wrong type"); }
+        };
+
+        let cmd_str = match (json_response.find(&~"command")) {
+          None      => { fail(~"response malformed. no command found") }
+          Some(cmd) =>  { Decoder(cmd).read_owned_str() } 
+        };
+        //io::println(fmt!("cmd: %s", cmd_str));  
+
+        let payload_str = match (json_response.find(&~"payload")) {
+          None => { fail(~"response malformed. no payload found") }
+          Some(payload) =>  { Decoder(payload).read_owned_str() } 
+        };
+
+        if (cmd_str == ~"std-out") {
+          let cmd = Some(payload_str);
+          std_out_channel.send(cmd);
+        } else {
+          fail(fmt!("unrecognized command %s", cmd_str));
+        }
+        //match (cmd_str) {
+        //  ~"std-out" => { std_out_channel.send(payload_str); }
+        //  _          => { fail(fmt!("unrecognized command %s", cmd_str)); }
+        //}
+        next_cmd = ~"";
+      }
     }
   }
+
+#[allow(non_implicitly_copyable_typarams)]
+fn main() {
+  let (input_file,bridge_cmd) = parse_cmd_arguments();
+  let props = ~std::map::HashMap();
+
+  wol::property_file::read_file(props, input_file);
+
+  let contains_jar        =  props.find(~"jar");
+  let contains_classpath  =  props.find(~"classpath");
+  let contains_main_class =  props.find(~"main.class");
+
+  let strategy = match (contains_jar, contains_classpath, contains_main_class) {
+    (None,   None    , None)      => { fail(~"jar or classpath + main class must be specified in properties file.  Neither load strategy found"); }
+    (Some(_), Some(_), Some(_))   => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
+    (Some(_), Some(_), None)      => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
+    (Some(_), None,    Some(_))   => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
+    (Some(r), None, None)         => { JarStrategy(r) }
+
+    (None, None,   Some(_))       => { fail(~"main class specified but not classpath") }
+    (None, Some(_), None)         => { fail(~"classpath specified but not main class") }
+    (None, Some(r), Some(s))      => { ClassPathStrategy(r,s) }
+  };
+
+
+  //wol::property_file::print_properties(props);
+
+  let socket : std::net_tcp::TcpSocket = ensure_connection( props.get(~"host"), props.get(~"port"), strategy);
+  let socket_buff : std::net_tcp::TcpSocketBuf = std::net_tcp::socket_buf(move socket);
+
+  //io::println("connection established!");
+  let bridge_cmd_json = bridge_cmd.to_json().to_str();
+
+  socket_buff.write( core::str::to_bytes(bridge_cmd_json) );
+
+  let (std_out_port, std_out_chan): (Port<Option<~str>>, Chan<Option<~str>>) = stream();
+  do spawn |move std_out_port| {
+    loop {
+      let cmd = std_out_port.recv();
+      match cmd {
+        None => { break; }
+        Some(payload) => {  io::print(payload);
+                            io::stdout().flush(); }
+      };
+    }
+  }
+
+  parse_cmd(socket_buff, std_out_chan);
+}
 
