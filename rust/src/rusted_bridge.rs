@@ -196,20 +196,11 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
           Some(payload) =>  { Decoder(payload).read_owned_str() } 
         };
 
-        //NB>use match
-        if (cmd_str == ~"std-out") {
-          let cmd = Some(payload_str);
-          std_out_channel.send(cmd);
-        } else if (cmd_str == ~"std-err") {
-          let cmd = Some(payload_str);
-          std_err_channel.send(cmd);
-        } else {
-          fail(fmt!("unrecognized command %s", cmd_str));
+        match (cmd_str) {
+          ~"std-out" => { std_out_channel.send(Some(payload_str)); }
+          ~"std-err" => { std_err_channel.send(Some(payload_str)); }
+          _          => { fail(fmt!("unrecognized command %s", cmd_str)); }
         }
-        //match (cmd_str) {
-        //  ~"std-out" => { std_out_channel.send(payload_str); }
-        //  _          => { fail(fmt!("unrecognized command %s", cmd_str)); }
-        //}
         next_cmd = ~"";
       }
     }
