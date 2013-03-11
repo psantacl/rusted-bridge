@@ -3,7 +3,9 @@
             [rusted-bridge.commands :as commands]))
 
 (defn -main [& args]
-  (println "in main: " args))
+  (println "in main: " args)
+  (binding [*out* *err*]
+    (println "this is an error")))
 
 (comment
   (apply -main "chicken of the sea")

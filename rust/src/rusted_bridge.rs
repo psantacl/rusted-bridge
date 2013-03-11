@@ -157,7 +157,8 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
 
 
   #[allow(non_implicitly_copyable_typarams)]
-  fn parse_cmd(socket_buff : std::net_tcp::TcpSocketBuf, std_out_channel : Chan<Option<~str>>) -> () {
+  fn parse_cmd(socket_buff : std::net_tcp::TcpSocketBuf, std_out_channel : Chan<Option<~str>>,
+               std_err_channel : Chan<Option<~str>>) -> () {
     let mut next_cmd : ~str = ~"";
     loop {
       //libc::funcs::posix88::unistd::sleep(1);
@@ -166,6 +167,7 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
       //socket connection was closed
       if (socket_buff.eof()) {
         std_out_channel.send(None);
+        std_err_channel.send(None);
         break;  
       }
 
@@ -194,9 +196,13 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
           Some(payload) =>  { Decoder(payload).read_owned_str() } 
         };
 
+        //NB>use match
         if (cmd_str == ~"std-out") {
           let cmd = Some(payload_str);
           std_out_channel.send(cmd);
+        } else if (cmd_str == ~"std-err") {
+          let cmd = Some(payload_str);
+          std_err_channel.send(cmd);
         } else {
           fail(fmt!("unrecognized command %s", cmd_str));
         }
@@ -244,6 +250,19 @@ fn main() {
   socket_buff.write( core::str::to_bytes(bridge_cmd_json) );
 
   let (std_out_port, std_out_chan): (Port<Option<~str>>, Chan<Option<~str>>) = stream();
+  let (std_err_port, std_err_chan): (Port<Option<~str>>, Chan<Option<~str>>) = stream();
+  
+  do spawn |move std_err_port| {
+    loop {
+      let cmd = std_err_port.recv();
+      match cmd {
+        None => { break; }
+        Some(payload) => {  io::stderr().write_str(payload);
+                            io::stderr().flush(); }
+      };
+    }
+  }
+
   do spawn |move std_out_port| {
     loop {
       let cmd = std_out_port.recv();
@@ -255,6 +274,6 @@ fn main() {
     }
   }
 
-  parse_cmd(socket_buff, std_out_chan);
+  parse_cmd(socket_buff, std_out_chan, std_err_chan);
 }
 
