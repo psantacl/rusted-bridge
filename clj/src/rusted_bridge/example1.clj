@@ -3,30 +3,21 @@
             [rusted-bridge.commands :as commands]))
 
 (defn -main [& args]
-  (println "in main: " args)
-  (binding [*out* *err*]
-    (println "this is an error")))
+  (println "what is your name?") 
+  (let [name (read-line)]
+    (println (format "hi there %s" name))))
+
 
 (comment
-  (apply -main "chicken of the sea")
-  
   (def server (server/start-bridge :dispatch-fn -main))
-  (.close server)
+  (server/stop-server server)
   
-  (binding [*out* (java.io.StringWriter.)]
-    (println "in main: " '("chicken"))
-    (clojure.data.json/write-str (.toString  *out*)))
-
-  (commands/def-bridge "chicken" "look at the chickens"
-    (println "chickens!"))
-  )
+)
 
 
 
-(let [chicken  (proxy [java.io.StringWriter] []
-                 (write [obj]
-                   (proxy-super write obj)
-                   (proxy-super toString)))]
-  (.write chicken "my bum hurts"))
+
+
+
 
 

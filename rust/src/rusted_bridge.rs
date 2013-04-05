@@ -16,8 +16,8 @@ use std::json::{ToJson,from_str,Error,Json, Object,to_str, Decoder};
 use libc::{c_char};
 use task::spawn;
 use pipes::{stream, Port, Chan};
-
-use io::WriterUtil;
+use io::{WriterUtil,ReaderUtil};
+use core::send_map::linear::{LinearMap};
 
 enum LoadStrategy {
   JarStrategy(~str),
@@ -158,10 +158,11 @@ fn parse_cmd_arguments() -> (~str,~str) {
 
 
 #[allow(non_implicitly_copyable_typarams)]
-fn parse_cmd_2(next_cmd : &str) -> (Option<(~Object,~str)>) {
+fn parse_cmd(next_cmd : &str) -> (Option<(~Object,~str)>) {
   let mut idx = 1;
-  while (idx < next_cmd.len()) {
+  while (idx < next_cmd.len() + 1) {
     let framed_cmd = core::str::slice(next_cmd,0,idx);
+    //io::println(fmt!("framed cmd: %s", framed_cmd));
     let parse_result : Result<Json,Error> = std::json::from_str(framed_cmd);
     if (!parse_result.is_err()) {
       let json_response = match( core::result::unwrap(parse_result) ) {
@@ -180,15 +181,16 @@ fn parse_cmd_2(next_cmd : &str) -> (Option<(~Object,~str)>) {
 //
 #[allow(non_implicitly_copyable_typarams)]
 fn event_loop(da_socket : std::net_tcp::TcpSocket, 
-    std_out_channel : Chan<Option<~str>>,
-    std_err_channel : Chan<Option<~str>>) -> () {
+              std_out_channel : Chan<Option<~str>>,
+              std_err_channel : Chan<Option<~str>>,
+              std_in_port     : Port<Option<~str>>) -> () {
 
   let mut next_cmd : ~str = ~"";
   let result = std::net_tcp::read_start( &da_socket );
 
   let socket_port = match(result.is_err()) {
     false => { core::result::unwrap(result) }
-    true  => { fail(~"Erro reading socket"); }
+    true  => { fail(~"Error reading socket"); }
   };
 
   loop {
@@ -198,6 +200,7 @@ fn event_loop(da_socket : std::net_tcp::TcpSocket,
         true => { 
          let err_data = result::unwrap_err(next_result);
          if err_data.err_name == ~"EOF" {
+            libc::funcs::c95::stdlib::exit(0);
            std_out_channel.send(None);
            std_err_channel.send(None);
            break;
@@ -210,7 +213,7 @@ fn event_loop(da_socket : std::net_tcp::TcpSocket,
 
       next_cmd = core::str::append(next_cmd, core::str::from_bytes(next_read));
       loop {
-        let (json_response,remaining_cmd) = match(parse_cmd_2(next_cmd)) {
+        let (json_response,remaining_cmd) = match(parse_cmd(next_cmd)) {
           None => { break; } 
           Some((json_response,remaining_cmd)) => { (json_response,remaining_cmd) }
         };
@@ -232,58 +235,29 @@ fn event_loop(da_socket : std::net_tcp::TcpSocket,
         }
       }     
     } 
-  }
-}
 
-#[allow(non_implicitly_copyable_typarams)]
-fn parse_cmd(socket_buff : std::net_tcp::TcpSocketBuf, std_out_channel : Chan<Option<~str>>,
-    std_err_channel : Chan<Option<~str>>) -> () {
-  let mut next_cmd : ~str = ~"";
-  loop {
-    //libc::funcs::posix88::unistd::sleep(1);
-    let read_res = socket_buff.read_byte();
+    if (std_in_port.peek()) {
+      let cmd = std_in_port.recv();
+      match cmd {
+        None => { break; }
+        Some(payload) => { 
+          let mut cmd_map : LinearMap<~str,~str> = LinearMap();
+          if (!cmd_map.insert( ~"cmd", ~"std-in" )) {
+            fail ~"could not insert cmd into json command";
+          }
+          if (!cmd_map.insert( ~"payload", payload )) {
+            fail ~"could not insert payload into json command";
+          };
 
-    //socket connection was closed
-    if (socket_buff.eof()) {
-      std_out_channel.send(None);
-      std_err_channel.send(None);
-      break;  
-    }
-
-    let next_char : ~str = core::str::from_byte(read_res as u8);
-    next_cmd = core::str::append(next_cmd, next_char);
-
-    //io::println(fmt!("next_cmd : %s", next_cmd ));
-
-    let parse_result : Result<Json,Error> = std::json::from_str(next_cmd);
-
-    if (!parse_result.is_err()) {
-      //io::println(fmt!("successfully parsed :%s",next_cmd));
-      let json_response = match( core::result::unwrap(parse_result) ) {
-        Object(cmd) => { cmd }
-        _           => { fail(~"received command was wrong type"); }
+          let bridge_cmd = cmd_map.to_json().to_str();
+          da_socket.write( core::str::to_bytes(bridge_cmd) );
+        }
       };
 
-      let cmd_str = match (json_response.find(&~"command")) {
-        None      => { fail(~"response malformed. no command found") }
-        Some(cmd) =>  { Decoder(cmd).read_owned_str() } 
-      };
-      //io::println(fmt!("cmd: %s", cmd_str));  
-
-      let payload_str = match (json_response.find(&~"payload")) {
-        None => { fail(~"response malformed. no payload found") }
-        Some(payload) =>  { Decoder(payload).read_owned_str() } 
-      };
-
-      match (cmd_str) {
-        ~"std-out" => { std_out_channel.send(Some(payload_str)); }
-        ~"std-err" => { std_err_channel.send(Some(payload_str)); }
-        _          => { fail(fmt!("unrecognized command %s", cmd_str)); }
-      }
-      next_cmd = ~"";
     }
   }
 }
+
 
 #[allow(non_implicitly_copyable_typarams)]
 fn main() {
@@ -314,14 +288,21 @@ fn main() {
   let socket : std::net_tcp::TcpSocket = ensure_connection( props.get(~"host"), props.get(~"port"), strategy);
   //let socket_buff : std::net_tcp::TcpSocketBuf = std::net_tcp::socket_buf(move socket);
 
-  //io::println("connection established!");
-  let bridge_cmd_json = bridge_cmd.to_json().to_str();
+  let mut cmd_map : LinearMap<~str,~str> = LinearMap();
+  if (!cmd_map.insert( ~"cmd", ~"exec" )) {
+    fail ~"could not insert cmd into json command";
+  }
+  if (!cmd_map.insert( ~"payload", bridge_cmd)) {
+    fail ~"could not insert payload into json command";
+  };
+  let bridge_cmd_json = cmd_map.to_json().to_str();
 
   //socket_buff.write( core::str::to_bytes(bridge_cmd_json) );
   socket.write( core::str::to_bytes(bridge_cmd_json) );
 
   let (std_out_port, std_out_chan): (Port<Option<~str>>, Chan<Option<~str>>) = stream();
   let (std_err_port, std_err_chan): (Port<Option<~str>>, Chan<Option<~str>>) = stream();
+  let (std_in_port, std_in_chan):   (Port<Option<~str>>, Chan<Option<~str>>) = stream();
 
   do spawn |move std_err_port| {
     loop {
@@ -345,7 +326,18 @@ fn main() {
     }
   }
 
-  event_loop(socket, std_out_chan, std_err_chan);
+  do spawn |move std_in_chan| {
+    loop {
+      if (io::stdin().eof()) {
+        io::println("stdin EOF reached");
+        break;
+      }
+      let next_line = io::stdin().read_line();
+      std_in_chan.send( Some( str::append( copy next_line,  ~"\n")) );
+    }
+  }
+
+  event_loop(socket, std_out_chan, std_err_chan, std_in_port);
   //parse_cmd(socket_buff, std_out_chan, std_err_chan);
 }
 

@@ -53,7 +53,8 @@
            (format "%s\n\t%s" k (:desc  v)))
          @registry))))
 
-(defn dispatch-command [^String incoming-cmd dispatch-fn]
+
+(defn exec-command [^String incoming-cmd dispatch-fn]
   (let [incoming-cmd    (if (.startsWith  incoming-cmd "/")
                           (.substring  incoming-cmd 1)
                           incoming-cmd)]
@@ -79,7 +80,9 @@
         :else
         (recur registered-cmds (match-cmd? incoming-cmd (first registered-cmds)))))))
 
-  (comment
+
+
+(comment
 
 
   ((:handler
