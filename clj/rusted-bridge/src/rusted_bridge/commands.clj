@@ -84,7 +84,6 @@
 
 (comment
 
-
   ((:handler
     (get @registry "chicken/ls")))
   
