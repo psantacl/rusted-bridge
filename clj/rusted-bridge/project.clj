@@ -1,4 +1,4 @@
-(defproject org.wol/rusted-bridge "1.0.0"
+(defproject org.wol/rusted-bridge "1.0.1-SNAPSHOT"
   :description "later"
   :dependencies [[org.clojure/clojure "1.4.0" ] 
                  [org.clojure/data.json "0.2.0"]

@@ -5,8 +5,10 @@
   (:gen-class))
 
 (defn -main [& args]
+  (def turkey args)
   (let [[matched-args [target-file & garbage] help-doc]
         (cli args ["-s" "--[no-]server" "start bridge server" :default false])]
+    (def chicken [target-file garbage])
      (if (:server matched-args)      
       (server/start-bridge :dispatch-fn -main)
       (doseq [next-file (-> (java.io.File.  target-file)
@@ -15,6 +17,9 @@
 
 
 (comment
+
+  (cli ["/tmp/"] ["-s" "--[no-]server" "start bridge server" :default false])
+  
   (def server (server/start-bridge :dispatch-fn -main))
   (server/stop-server server)
 

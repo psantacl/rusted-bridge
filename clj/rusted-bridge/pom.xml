@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.wol</groupId>
   <artifactId>rusted-bridge</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1-SNAPSHOT</version>
   <name>rusted-bridge</name>
   <description>later</description>
   <build>

@@ -148,8 +148,9 @@ fn parse_cmd_arguments() -> (~str,~str) {
     }
   }
 
-  let bridge_cmd = str::connect(vec::slice(args,1, vec::len(args)), &" ");
+  let bridge_cmd = str::connect(vec::slice(args,2, vec::len(args)), &" ");
 
+  io::println(fmt!("bridge_cmd %s", bridge_cmd));
   return (inferred_input_file.to_str(), bridge_cmd);
 }
 
