@@ -131,28 +131,26 @@ fn ensure_connection(host: ~str, port: ~str, strategy: LoadStrategy) -> (std::ne
   core::result::unwrap(conn_res)
 }
 
+
+#[allow(non_implicitly_copyable_typarams)]
 fn parse_cmd_arguments() -> (~str,~str) {
-  let opts = ~[ optopt("c") ];
   let args = os::args();
-
-  let matches = match getopts(vec::view(args, 1, args.len()), opts) {
-    result::Ok(m)  => { copy m }
-    result::Err(f) => { fail fail_str(copy f) }
+  let homedir = match os::homedir() {
+    None       => { fail(~"could not determine users home dir to find config file"); }
+    Some(path) =>  { path }
   };
 
-  let input_file = match opt_maybe_str(copy &matches, "c" ) {
-    option::Some(s) => { copy s }
-    option::None() => { core::os::getcwd().push(".rusted-bridge").to_str() } 
-
-  };
-
-  if (vec::is_empty(matches.free)) {
-    fail ~"please specify a command to send over the bridge"
+  let inferred_input_file = homedir.push(".rusted-bridge").push( args[1] );
+  
+  do str::as_c_str(inferred_input_file.to_str()) |input_file| {
+    if ( libc::funcs::posix88::unistd::access(input_file,  libc::consts::os::posix88::R_OK as core::libc::types::os::arch::c95::c_int) != 0) {
+      fail(fmt!("unable to read config file %s", inferred_input_file.to_str()));
+    }
   }
 
-  let bridge_cmd = matches.free.foldl( ~"", |accum,e| str::append(copy *accum, str::append( ~"/",  *e) ) );
+  let bridge_cmd = str::connect(vec::slice(args,1, vec::len(args)), &" ");
 
-  return (input_file, bridge_cmd);
+  return (inferred_input_file.to_str(), bridge_cmd);
 }
 
 
