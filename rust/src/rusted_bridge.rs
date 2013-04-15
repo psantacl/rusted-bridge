@@ -1,4 +1,3 @@
-
 extern mod std;
 extern mod wol;
 
@@ -19,82 +18,7 @@ use pipes::{stream, Port, Chan};
 use io::{WriterUtil,ReaderUtil};
 use core::send_map::linear::{LinearMap};
 
-enum LoadStrategy {
-  JarStrategy(~str),
-  ClassPathStrategy(~str,~str) 
-}
-
-fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
-  libc::funcs::posix88::unistd::setsid();
-  do str::as_c_str(~"java") |c_cmd| {
-    do str::as_c_str(~"-cp") |c_cp_flag| {
-      do str::as_c_str(cp) |c_cp| {
-        do str::as_c_str(~"clojure.main") |c_clj_class| {
-          do str::as_c_str(~"-m") |c_main_flag| {
-            do str::as_c_str(main_class) |c_namespace| {
-              do str::as_c_str(~"--server") |c_server_flag| {
-                let null_ptr  = ptr::null();
-                let args      = [c_cmd, c_cp_flag, c_cp, c_clj_class, c_main_flag, c_namespace, c_server_flag, null_ptr];
-                unsafe {
-                  let result = libc::funcs::posix88::unistd::execvp( c_cmd,  vec::raw::to_ptr(args) );  
-                  io::println(result.to_str());
-                  if (result == -1) {
-                    fail(~"unable to exec jvm");
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-fn run_jar_strategy(jar: ~str) -> () {
-  //NB> check for EPERM setsid failure
-  libc::funcs::posix88::unistd::setsid();
-  do str::as_c_str(~"java") |c_cmd| {
-    do str::as_c_str(~"-jar") |c_jar_flag| {
-      do str::as_c_str(jar) |c_jar_location| {
-        do str::as_c_str(~"--server") |c_server_flag| {
-          let null_ptr  = ptr::null();
-          let args      = [c_cmd, c_jar_flag, c_jar_location, c_server_flag, null_ptr];
-          unsafe {
-            let result = libc::funcs::posix88::unistd::execvp( c_cmd,  vec::raw::to_ptr(args) );  
-            io::println(result.to_str());
-            if (result == -1) {
-              fail(~"unable to exec jvm");
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-fn produce_pid_file() -> () {
-  let our_pid = libc::funcs::posix88::unistd::getpid();
-
-  let w: Result<io::Writer,~str> = io::buffered_file_writer(&path::Path("pid_file.txt")); 
-  if w.is_err() {
-    io::println(~"unable to open pid_file.txt for writing");
-    return;
-  }
-
-  let wrt: io::Writer = w.get();
-  wrt.write_int(our_pid as int);
-}
-
-fn daemonize(strategy: LoadStrategy) -> () {
-  produce_pid_file();
-
-  match strategy {
-    JarStrategy(location) => { run_jar_strategy(location) }
-    ClassPathStrategy(cp,main_class) => { run_cp_strategy(cp,main_class) }
-  }
-}
-
+mod daemon_tools;
 
 fn poll_for_connection(host: &str, port: &str) -> (std::net_tcp::TcpSocket) {
   let mut count = 0;
@@ -113,7 +37,7 @@ fn poll_for_connection(host: &str, port: &str) -> (std::net_tcp::TcpSocket) {
   fail(fmt!("failed to connect to service after %d attempts", count));
 }
 
-fn ensure_connection(host: ~str, port: ~str, strategy: LoadStrategy) -> (std::net_tcp::TcpSocket) {
+fn ensure_connection(host: ~str, port: ~str, bridge : &daemon_tools::Bridge) -> (std::net_tcp::TcpSocket) {
   let io_task = uv::global_loop::get();
   let conn_res : Result<std::net_tcp::TcpSocket,std::net_tcp::TcpConnectErrData> = std::net_tcp::connect( std::net_ip::v4::parse_addr(host.to_managed()), 
       option::unwrap(uint::from_str(port.to_managed())), 
@@ -123,7 +47,7 @@ fn ensure_connection(host: ~str, port: ~str, strategy: LoadStrategy) -> (std::ne
     if (pid < 0) {
       fail ~"Error: unable to fork whilst trying to launch jvm"
     } else if (pid == 0) {
-      daemonize(strategy);
+      daemon_tools::daemonize(bridge);
     } else {
       return poll_for_connection(host,port);
     }
@@ -133,15 +57,16 @@ fn ensure_connection(host: ~str, port: ~str, strategy: LoadStrategy) -> (std::ne
 
 
 #[allow(non_implicitly_copyable_typarams)]
-fn parse_cmd_arguments() -> (~str,~str) {
+fn parse_cmd_arguments() -> (path::Path, ~str,~str) {
   let args = os::args();
   let homedir = match os::homedir() {
     None       => { fail(~"could not determine users home dir to find config file"); }
     Some(path) =>  { path }
   };
 
-  let inferred_input_file = homedir.push(".rusted-bridge").push( args[1] );
-  
+  let inferred_input_file = homedir.push(".rusted-bridge").push( args[1] ).push("config");
+  let pid_file = homedir.push(".rusted-bridge").push( args[1] ).push("pid");
+
   do str::as_c_str(inferred_input_file.to_str()) |input_file| {
     if ( libc::funcs::posix88::unistd::access(input_file,  libc::consts::os::posix88::R_OK as core::libc::types::os::arch::c95::c_int) != 0) {
       fail(fmt!("unable to read config file %s", inferred_input_file.to_str()));
@@ -151,7 +76,7 @@ fn parse_cmd_arguments() -> (~str,~str) {
   let bridge_cmd = str::connect(vec::slice(args,2, vec::len(args)), &" ");
 
   io::println(fmt!("bridge_cmd %s", bridge_cmd));
-  return (inferred_input_file.to_str(), bridge_cmd);
+  return (pid_file, inferred_input_file.to_str(), bridge_cmd);
 }
 
 
@@ -177,7 +102,6 @@ fn parse_cmd(next_cmd : &str) -> (Option<(~Object,~str)>) {
   return None;
 }
 
-//
 #[allow(non_implicitly_copyable_typarams)]
 fn event_loop(da_socket : std::net_tcp::TcpSocket, 
               std_out_channel : Chan<Option<~str>>,
@@ -260,7 +184,7 @@ fn event_loop(da_socket : std::net_tcp::TcpSocket,
 
 #[allow(non_implicitly_copyable_typarams)]
 fn main() {
-  let (input_file,bridge_cmd) = parse_cmd_arguments();
+  let (pid_file, input_file, bridge_cmd) = parse_cmd_arguments();
   let props = ~std::map::HashMap();
 
   wol::property_file::read_file(props, input_file);
@@ -269,22 +193,24 @@ fn main() {
   let contains_classpath  =  props.find(~"classpath");
   let contains_main_class =  props.find(~"main.class");
 
-  let strategy = match (contains_jar, contains_classpath, contains_main_class) {
+  let bridge : daemon_tools::Bridge = match (contains_jar, contains_classpath, contains_main_class) {
     (None,   None    , None)      => { fail(~"jar or classpath + main class must be specified in properties file.  Neither load strategy found"); }
     (Some(_), Some(_), Some(_))   => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
     (Some(_), Some(_), None)      => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
     (Some(_), None,    Some(_))   => { fail(~"jar AND classpath + main class specified in properties file. Please pick a single load strategy"); }
-    (Some(r), None, None)         => { JarStrategy(r) }
+    (Some(r), None, None)         => { daemon_tools::Bridge { strategy: daemon_tools::JarStrategy(r),
+                                                              pid_file : pid_file } }
 
     (None, None,   Some(_))       => { fail(~"main class specified but not classpath") }
     (None, Some(_), None)         => { fail(~"classpath specified but not main class") }
-    (None, Some(r), Some(s))      => { ClassPathStrategy(r,s) }
+    (None, Some(r), Some(s))      => { daemon_tools::Bridge { strategy : daemon_tools::ClassPathStrategy(r,s),
+                                                              pid_file : pid_file } }
   };
 
 
   //wol::property_file::print_properties(props);
 
-  let socket : std::net_tcp::TcpSocket = ensure_connection( props.get(~"host"), props.get(~"port"), strategy);
+  let socket : std::net_tcp::TcpSocket = ensure_connection( props.get(~"host"), props.get(~"port"), &bridge);
   //let socket_buff : std::net_tcp::TcpSocketBuf = std::net_tcp::socket_buf(move socket);
 
   let mut cmd_map : LinearMap<~str,~str> = LinearMap();
