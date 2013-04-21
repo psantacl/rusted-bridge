@@ -1,6 +1,6 @@
 (ns org.wol.clj-ls.core
-  (:require [rusted-bridge.server :as server]
-            [rusted-bridge.commands :as commands])
+  (:require [org.wol.rusted-bridge.server :as server]
+            [org.wol.rusted-bridge.commands :as commands])
   (:use [clojure.tools.cli :only [cli]])
   (:gen-class))
 
