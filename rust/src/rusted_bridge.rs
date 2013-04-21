@@ -75,7 +75,7 @@ fn parse_cmd_arguments() -> (path::Path, ~str,~str) {
 
   let bridge_cmd = str::connect(vec::slice(args,2, vec::len(args)), &" ");
 
-  io::println(fmt!("bridge_cmd %s", bridge_cmd));
+  //io::println(fmt!("bridge_cmd %s", bridge_cmd));
   return (pid_file, inferred_input_file.to_str(), bridge_cmd);
 }
 
@@ -106,7 +106,7 @@ fn parse_cmd(next_cmd : &str) -> (Option<(~Object,~str)>) {
 fn event_loop(da_socket : std::net_tcp::TcpSocket, 
               std_out_channel : Chan<Option<~str>>,
               std_err_channel : Chan<Option<~str>>,
-              std_in_port     : Port<Option<~str>>) -> () {
+              std_in_port     : Port<(~str, ~str)>) -> () {
 
   let mut next_cmd : ~str = ~"";
   let result = std::net_tcp::read_start( &da_socket );
@@ -160,23 +160,17 @@ fn event_loop(da_socket : std::net_tcp::TcpSocket,
     } 
 
     if (std_in_port.peek()) {
-      let cmd = std_in_port.recv();
-      match cmd {
-        None => { break; }
-        Some(payload) => { 
-          let mut cmd_map : LinearMap<~str,~str> = LinearMap();
-          if (!cmd_map.insert( ~"cmd", ~"std-in" )) {
-            fail ~"could not insert cmd into json command";
-          }
-          if (!cmd_map.insert( ~"payload", payload )) {
-            fail ~"could not insert payload into json command";
-          };
-
-          let bridge_cmd = cmd_map.to_json().to_str();
-          da_socket.write( core::str::to_bytes(bridge_cmd) );
-        }
+      let (cmd,payload) = std_in_port.recv();
+      let mut cmd_map : LinearMap<~str,~str> = LinearMap();
+      if (!cmd_map.insert( ~"cmd", cmd)) {
+        fail ~"could not insert cmd into json command";
+      }
+      if (!cmd_map.insert( ~"payload", payload)) {
+        fail ~"could not insert payload into json command";
       };
-
+      let bridge_cmd = cmd_map.to_json().to_str();
+      //io::println(fmt!("RUST sending: %s",  cmd_map.to_json().to_str()));
+      da_socket.write( core::str::to_bytes(bridge_cmd) );
     }
   }
 }
@@ -227,7 +221,8 @@ fn main() {
 
   let (std_out_port, std_out_chan): (Port<Option<~str>>, Chan<Option<~str>>) = stream();
   let (std_err_port, std_err_chan): (Port<Option<~str>>, Chan<Option<~str>>) = stream();
-  let (std_in_port, std_in_chan):   (Port<Option<~str>>, Chan<Option<~str>>) = stream();
+  let (std_in_port, std_in_chan):   (Port<(~str,~str)>, 
+                                     Chan<(~str,~str)>) = stream();
 
   do spawn |move std_err_port| {
     loop {
@@ -254,11 +249,13 @@ fn main() {
   do spawn |move std_in_chan| {
     loop {
       if (io::stdin().eof()) {
-        io::println("stdin EOF reached");
+        //io::println("RUST: stdin EOF reached");
+        std_in_chan.send( (~"std-in-close", ~"") );
         break;
       }
       let next_line = io::stdin().read_line();
-      std_in_chan.send( Some( str::append( copy next_line,  ~"\n")) );
+      //io::println(fmt!("next_line: %s", next_line));
+      std_in_chan.send( (~"std-in",  str::append( copy next_line,  ~"\n")) );
     }
   }
 

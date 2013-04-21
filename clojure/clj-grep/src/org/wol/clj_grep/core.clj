@@ -8,7 +8,7 @@
   (let [[matched-args [pattern & garbage] help-doc]
         (cli args ["-s" "--[no-]server" "start bridge server" :default false])]
     (if (:server matched-args)      
-      (server/start-bridge :dispatch-fn -main)
+      (server/start-bridge :dispatch-fn -main :port 9001)
       (let [pattern (re-pattern pattern)]
         (loop []
           (when-let [next-line (read-line)]

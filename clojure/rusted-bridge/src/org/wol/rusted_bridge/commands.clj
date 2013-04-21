@@ -1,4 +1,4 @@
-(ns rusted-bridge.commands
+(ns org.wol.rusted-bridge.commands
   (:require
    clojure.string
    [clojure.data.json :as json])
