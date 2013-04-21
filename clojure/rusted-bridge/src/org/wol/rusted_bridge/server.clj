@@ -87,9 +87,7 @@
                 (reset! eof-reached true)
                 
                 :unrecognized-cmd
-                (do
-                  (def *burger* msg)
-                  (throw (Exception. (format "unrecognized command: %s" (get msg "cmd")))))))))
+                (throw (Exception. (format "unrecognized command: %s" (get msg "cmd"))))))))
     
     
     (exceptionCaught [ctx ex]
@@ -108,7 +106,8 @@
             (.write (ChannelBuffers/EMPTY_BUFFER))
             (.addListener  (ChannelFutureListener/CLOSE)))))
     
-    (channelDisconnected [ctx e])))
+    (channelDisconnected [ctx e]))
+  )
 
 
 (defn make-executor []

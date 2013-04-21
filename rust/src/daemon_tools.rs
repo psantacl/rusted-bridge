@@ -38,6 +38,9 @@ fn run_cp_strategy(cp: ~str, main_class: ~str) -> () {
 fn run_jar_strategy(jar: ~str) -> () {
   //NB> check for EPERM setsid failure
   libc::funcs::posix88::unistd::setsid();
+  libc::funcs::posix88::unistd::close(libc::consts::os::posix88::STDIN_FILENO as core::libc::types::os::arch::c95::c_int);
+  libc::funcs::posix88::unistd::close(libc::consts::os::posix88::STDOUT_FILENO as core::libc::types::os::arch::c95::c_int);
+  libc::funcs::posix88::unistd::close(libc::consts::os::posix88::STDERR_FILENO as core::libc::types::os::arch::c95::c_int);
   do str::as_c_str(~"java") |c_cmd| {
     do str::as_c_str(~"-jar") |c_jar_flag| {
       do str::as_c_str(jar) |c_jar_location| {
