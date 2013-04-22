@@ -14,7 +14,7 @@
           (when-let [next-line (read-line)]
             (if (re-find pattern next-line)
               (println next-line))            
-            (recur )))))))
+            (recur)))))))
 
 
 
@@ -23,4 +23,10 @@
   (def server (server/start-bridge :dispatch-fn -main :port 9001))
   (server/stop-server server)
 
+
+  (def burger ( atom []))
+  (doseq [a @burger]
+    (if (re-find (re-pattern "screen") a)
+      (println a)))
+  
   )

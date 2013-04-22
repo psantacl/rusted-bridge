@@ -123,9 +123,9 @@ fn event_loop(da_socket : std::net_tcp::TcpSocket,
         true => { 
          let err_data = result::unwrap_err(next_result);
          if err_data.err_name == ~"EOF" {
-            libc::funcs::c95::stdlib::exit(0);
            std_out_channel.send(None);
            std_err_channel.send(None);
+           libc::funcs::c95::stdlib::exit(0);
            break;
          } else {
            fail ~"Error reading socket" 
@@ -151,6 +151,7 @@ fn event_loop(da_socket : std::net_tcp::TcpSocket,
           Some(payload) =>  { Decoder(payload).read_owned_str() } 
         };
 
+        //io::println(fmt!("json_response: %s => %s", cmd_str, payload_str));
         match (cmd_str) {
           ~"std-out" => { std_out_channel.send(Some(payload_str)); }
           ~"std-err" => { std_err_channel.send(Some(payload_str)); }
@@ -240,7 +241,8 @@ fn main() {
       let cmd = std_out_port.recv();
       match cmd {
         None => { break; }
-        Some(payload) => {  io::print(payload);
+        Some(payload) => {  
+          io::print(payload);
           io::stdout().flush(); }
       };
     }
@@ -248,13 +250,14 @@ fn main() {
 
   do spawn |move std_in_chan| {
     loop {
+      //NB> rust appears to return a blank link just prior to signalling EOF
+      let next_line = io::stdin().read_line();
       if (io::stdin().eof()) {
         //io::println("RUST: stdin EOF reached");
         std_in_chan.send( (~"std-in-close", ~"") );
         break;
       }
-      let next_line = io::stdin().read_line();
-      //io::println(fmt!("next_line: %s", next_line));
+      //io::println(fmt!("RUST next_line: %s", next_line));
       std_in_chan.send( (~"std-in",  str::append( copy next_line,  ~"\n")) );
     }
   }
