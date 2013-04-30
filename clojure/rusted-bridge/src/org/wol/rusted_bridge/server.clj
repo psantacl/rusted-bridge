@@ -16,6 +16,12 @@
 
 (def config {:port 9000})
 
+(defn valid-keys? [params key-lists]
+  (some  (fn [key-list]
+           (= (set key-list)
+              (set (keys params))))
+         key-lists))
+
 (defn make-string-writer [ctx cmd]
   (proxy [java.io.StringWriter] []
     (write [obj]
@@ -38,29 +44,28 @@
       (let [nascent-data (.getBytes in-payload-data "UTF-8")]
         (.write out-pipe nascent-data 0 (count nascent-data))))))
 
+(defn make-close-calleable [out-pipe]
+  (reify  java.util.concurrent.Callable
+    (call [self]
+      (.flush out-pipe)      
+      (.close out-pipe))))
 
-(def out-pipe       (java.io.PipedOutputStream. ))
-(def in-pipe        (java.io.PipedInputStream. out-pipe))
 (def std-in-thread  (java.util.concurrent.Executors/newSingleThreadExecutor))
-(def eof-reached    (atom false))
+(def std-in         (atom nil))
 
+(def out-pipe       (atom nil))
+(def in-pipe        (atom nil))
 
-;;NB> support  read (cbuf,  off,  len)
-(defn make-in [input-stream]
-  (proxy [clojure.lang.LineNumberingPushbackReader] [input-stream]
-    (read []
-      (if (and @eof-reached
-               (not (.ready this)))
-        -1
-        (proxy-super read )))
-    
-    
-    (readLine []
-      (if (and @eof-reached
-               (not (.ready this)))
-        nil
-        (proxy-super readLine)))))
+(defn ensure-std-in [input-stream]
+  (if @std-in
+    @std-in
+    (reset! std-in (clojure.lang.LineNumberingPushbackReader. input-stream))))
 
+(defn ensure-pipes []
+  (when (and (nil? @out-pipe)
+             (nil? @in-pipe))
+    (reset! out-pipe (java.io.PipedOutputStream.))
+    (reset! in-pipe (java.io.PipedInputStream. @out-pipe))))
 
 (defn make-handler [dispatch-fn]
   (proxy [SimpleChannelUpstreamHandler] []
@@ -68,34 +73,37 @@
     (messageReceived [ctx e]
       (let [msg            (.getMessage e)
             channel        (.getChannel ctx)]
+        (ensure-pipes)
         (binding [*out* (make-string-writer ctx "std-out")
                   *err* (make-string-writer ctx "std-err")
-                  *in*  (make-in (java.io.InputStreamReader. in-pipe "UTF-8"))]
+                  *in*  (ensure-std-in (java.io.InputStreamReader. @in-pipe "UTF-8"))]
           (cond (= (get msg "cmd") "exec")
                 (do
                   (commands/exec-command (get msg "payload") dispatch-fn)
+                  (.close @in-pipe)
+                  (reset! std-in nil)
+                  (reset! out-pipe nil)
+                  (reset! in-pipe nil)
                   (-> channel
                       (.write (ChannelBuffers/EMPTY_BUFFER))
-                      (.addListener (ChannelFutureListener/CLOSE)))
-                  (reset! eof-reached false))
+                      (.addListener (ChannelFutureListener/CLOSE))))               
 
                 (= (get msg "cmd") "std-in")
                 (do
-                  (.submit std-in-thread (make-callalble out-pipe  (get msg "payload"))))
+                  (.submit std-in-thread (make-callalble @out-pipe  (get msg "payload"))))
                 
                 (= (get msg "cmd") "std-in-close")
-                (reset! eof-reached true)
+                (do
+                  (.submit std-in-thread (make-close-calleable @out-pipe)))
                 
                 :unrecognized-cmd
                 (throw (Exception. (format "unrecognized command: %s" (get msg "cmd"))))))))
-    
     
     (exceptionCaught [ctx ex]
       (let [stack-trace  (with-out-str
                            (.printStackTrace (.getCause ex)
                                              (java.io.PrintWriter. *out*)))
-            channel          (.getChannel ctx)]
-        (reset! eof-reached false)
+            channel          (.getChannel ctx)]        
         (-> channel
             (.write 
              (ChannelBuffers/copiedBuffer
@@ -104,11 +112,13 @@
               (java.nio.charset.Charset/forName "UTF-8"))))
         (-> channel
             (.write (ChannelBuffers/EMPTY_BUFFER))
-            (.addListener  (ChannelFutureListener/CLOSE)))))
-    
-    (channelDisconnected [ctx e]))
-  )
-
+            (.addListener  (ChannelFutureListener/CLOSE)))
+        (.submit std-in-thread (make-close-calleable out-pipe))
+        (.close @in-pipe)
+        (reset! std-in nil)
+        (reset! out-pipe nil)
+        (reset! in-pipe nil)))        
+    (channelDisconnected [ctx e])))
 
 (defn make-executor []
   (proxy [org.jboss.netty.handler.execution.OrderedMemoryAwareThreadPoolExecutor] [16 1048576 1048576]
@@ -122,9 +132,7 @@
             1
 
             :else
-            2
-            ))))
-
+            2))))
 
 (defn make-decoder []
   (proxy [FrameDecoder] []
@@ -151,13 +159,6 @@
                       (.readerIndex buffer (+ reader-index pos))
                       cmd)
                     (recur (inc pos) )))))))))
-
-(defn valid-keys? [params key-lists]
-  (some  (fn [key-list]
-           (= (set key-list)
-              (set (keys params))))
-         key-lists))
-
 
 (defn start-server [opts]
   (let [dispatch-fn (:dispatch-fn opts)
@@ -205,8 +206,6 @@
         (when next-line
           (println next-line)
           (recur)))))
-
-  
 
   
   (def test-server (start-bridge :dispatch-fn chicken))
